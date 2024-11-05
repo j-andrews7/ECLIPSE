@@ -51,9 +51,12 @@ ROSE does this manually by calling samtools for each region, which is slow.
 }
 }
 \examples{
+library(GenomicRanges)
+\dontrun{
 sample.bam <- "path/to/sample.bam"
 regions <- GRanges(seqnames = "chr1", ranges = IRanges(1000, 2000))
 regions <- add_region_signal(sample.bam, regions, floor = 10)
+}
 }
 \author{
 Jared Andrews

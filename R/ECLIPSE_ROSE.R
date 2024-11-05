@@ -1,37 +1,13 @@
-#' Fetches TSSes or promoters from a TxDb object
-#'
-#' This function fetches TSS regions and optionally expands them by a specified number of bases.
-#'
-#' @param TxDb TxDb object to fetch TSSes from.
-#' @param expansion.distance Number of bases to add up/downstream of TSSes.
-#' @return GRanges object of TSSes or promoters for each transcrip in `TxDb`.
-#'
-#' @export
-#' @importFrom GenomicRanges promoters
-#'
-#' @author Jacqueline Myers, Jared Andrews
-#' @examples
-#' library(TxDb.Hsapiens.UCSC.hg19.knownGene)
-#' TxDb <- TxDb.Hsapiens.UCSC.hg19.knownGene
-#' tsses <- fetch_tss(TxDb, expansion.distance = 1000)
-fetch_tss <- function(TxDb, expansion.distance = 0) {
-    if (expansion.distance > 0) {
-        y <- promoters(TxDb, upstream = expansion.distance, downstream = expansion.distance)
-    } else {
-        y <- promoters(TxDb, upstream = 0, downstream = 0)
-    }
-    y
-}
-
-
 #' Extend reads directionally upstream and downstream
 #'
 #' Extends reads by a specified number of bases upstream or downstream
 #' based on strand orientation.
 #'
 #' @param regions A GRanges object containing genomic regions.
-#' @param upstream Number of bases to extend upstream. Default is 0.
-#' @param downstream Number of bases to extend downstream. Default is 0.
+#' @param upstream Number of bases to extend upstream. 
+#'   Default is 0.
+#' @param downstream Number of bases to extend downstream. 
+#'   Default is 0.
 #'
 #' @return A GRanges object with extended regions.
 #'
@@ -42,6 +18,7 @@ fetch_tss <- function(TxDb, expansion.distance = 0) {
 #' @author Jared Andrews
 #'
 #' @examples
+#' library(GenomicRanges)
 #' regions <- GRanges(seqnames = "chr1", ranges = IRanges(100, 200), strand = "+")
 #' extended <- extend_reads(regions, upstream = 50, downstream = 100)
 extend_reads <- function(regions, upstream = 0, downstream = 0) {
@@ -50,6 +27,126 @@ extend_reads <- function(regions, upstream = 0, downstream = 0) {
     ext_end <- end(regions) + ifelse(pos, downstream, upstream)
     ranges(regions) <- IRanges(ext_start, ext_end)
     regions
+}
+
+
+#' Unstitch regions based on overlaps with TSS
+#'
+#' This function takes stitched regions and identifies overlaps with TSS regions.
+#' If a given stitched region overlaps TSS from more than a specified number of unique genes,
+#' the region is unstitched into its original components from the `original` regions.
+#'
+#' @details
+#' This attempts to emulate the method used by ROSE, but the results it returns are not identical due to a presumed bug in ROSE
+#' wherein it does not always properly find all overlaps.
+#'
+#' @param stitched A `GRanges`` object representing the stitched regions.
+#' @param original A `GRanges`` object representing the original regions prior to stitching.
+#' @param tss A `GRanges`` object representing the TSS regions.
+#' @param id.col A character string specifying the column name in the TSS object that contains gene IDs. 
+#'   Default is "GENEID".
+#' @param threshold An integer specifying the threshold for the number of unique genes before unstitching is applied. 
+#'   Default is 2.
+#'
+#' @return A list with a `hits` data.frame with the following columns:
+#' \describe{
+#'   \item{qhits}{Query hits corresponding to the stitched regions.}
+#'   \item{chrom}{Chromosome names of the stitched regions.}
+#'   \item{start}{Start positions of the stitched regions.}
+#'   \item{end}{End positions of the stitched regions.}
+#'   \item{num_olap}{Number of unique genes overlapping each stitched region.}
+#'   \item{ids}{Comma-separated gene IDs overlapping each stitched region.}
+#' }
+#'
+#' The `regions` element of the list contains a GRanges object with the stitched regions
+#' and the original regions resulting from unstitching.
+#'
+#' @importFrom GenomicRanges findOverlaps seqnames start end mcols
+#' @importFrom S4Vectors subjectHits
+#'
+#' @export
+#'
+#' @author Jared Andrews
+#'
+#' @examples
+#' library(GenomicRanges)
+#' 
+#' # Create example stitched regions
+#' stitched <- GRanges(seqnames = c("chr1", "chr1", "chr2"),
+#'                     ranges = IRanges(start = c(100, 300, 500),
+#'                     end = c(200, 400, 600)),
+#'                     strand = c("+", "-", "+"))
+#' 
+#' # Create example original regions
+#' original <- GRanges(seqnames = c("chr1", "chr1", "chr2", "chr2"),
+#'                     ranges = IRanges(start = c(100, 150, 300, 500),
+#'                     end = c(150, 200, 350, 550)),
+#'                     strand = c("+", "+", "-", "+"))
+#' 
+#' # Create example TSS regions with gene IDs
+#' tss <- GRanges(seqnames = c("chr1", "chr1", "chr1", "chr1", "chr2"),
+#'                ranges = IRanges(start = c(120, 140, 160, 320, 520), 
+#'                end = c(130, 150, 170, 330, 530)),
+#'                strand = c("+", "+", "+", "-", "+"),
+#'                GENEID = c("gene1", "gene11", "gene111", "gene2", "gene3"))
+#' 
+#' # Run the unstitch_regions function
+#' result <- unstitch_regions(stitched, original, tss, id.col = "GENEID", threshold = 2)
+#' 
+#' # Print the result
+#' result
+unstitch_regions <- function(stitched, original, tss, id.col = "GENEID", threshold = 2) {
+    # Find overlaps between stitched regions and TSS regions
+    overlaps <- findOverlaps(stitched, tss)
+
+    # Extract GENEID from TSS overlaps
+    overlap_df <- as.data.frame(overlaps)
+    overlap_df[[id.col]] <- as.character(mcols(tss)[[id.col]][overlap_df$subjectHits])
+
+    # Calculate the number of unique genes overlapping each stitched region
+    unique_genes_per_stitched <- lapply(unique(overlap_df$queryHits), function(x) {
+        y <- overlap_df[overlap_df$queryHits == x, ]
+        length(unique(y[[id.col]]))
+    })
+
+    # Snag the actual symbols as well
+    unique_symbols_per_stitched <- lapply(unique(overlap_df$queryHits), function(x) {
+        y <- overlap_df[overlap_df$queryHits == x, ]
+        unique(y[[id.col]])
+    })
+
+    names(unique_genes_per_stitched) <- unique(overlap_df$queryHits)
+    names(unique_symbols_per_stitched) <- unique(overlap_df$queryHits)
+
+    hit_df <- data.frame(
+        qhits = unique(overlap_df$queryHits),
+        chrom = seqnames(stitched[unique(overlap_df$queryHits)]),
+        start = start(stitched[unique(overlap_df$queryHits)]),
+        end = end(stitched[unique(overlap_df$queryHits)]),
+        num_olap = unlist(unique_genes_per_stitched),
+        ids = unlist(lapply(unique_symbols_per_stitched, paste, collapse = ","))
+    )
+
+    hit_df$unstitch <- FALSE
+    hit_df$unstitch[hit_df$num_olap > threshold] <- TRUE
+
+    # Regions that do not need to be unstitched
+    need_unstitch <- hit_df$qhits[hit_df$unstitch == TRUE]
+    regions_to_keep <- stitched[-need_unstitch]
+
+    # Regions that need to be unstitched
+    if (any(need_unstitch)) {
+        stitched_to_unstitch <- stitched[need_unstitch]
+        overlaps_unstitch <- findOverlaps(stitched_to_unstitch, original)
+        regions_to_unstitch <- original[subjectHits(overlaps_unstitch)]
+        # Combine the regions
+        final_regions <- c(regions_to_keep, regions_to_unstitch)
+    } else {
+        final_regions <- regions_to_keep
+    }
+
+    out <- list(regions = final_regions, hits = hit_df)
+    out
 }
 
 
@@ -95,9 +192,12 @@ extend_reads <- function(regions, upstream = 0, downstream = 0) {
 #' @author Jared Andrews
 #'
 #' @examples
+#' library(GenomicRanges)
+#' \dontrun{
 #' sample.bam <- "path/to/sample.bam"
 #' regions <- GRanges(seqnames = "chr1", ranges = IRanges(1000, 2000))
 #' regions <- add_region_signal(sample.bam, regions, floor = 10)
+#' }
 add_region_signal <- function(sample.bam,
                               regions,
                               control.bam = NULL,
@@ -183,7 +283,10 @@ add_region_signal <- function(sample.bam,
 #' @author Jared Andrews, Jacqueline Myers
 #'
 #' @examples
-#' regions <- GRanges(seqnames = "chr1", ranges = IRanges(1000, 2000))
+#' library(GenomicRanges)
+#' regions <- GRanges(seqnames = c("chr1", "chr2", "chr3"),
+#'                    start = c(100, 200, 300),
+#'                    end = c(200, 300, 400))
 #' regions$sample_signal <- rnorm(length(regions))
 #' regions$control_signal <- rnorm(length(regions))
 #' ranked_regions <- get_ranking_signal(regions)
@@ -245,7 +348,10 @@ add_signal_rank <- function(regions, negative.to.zero = TRUE) {
 #' @author Jared Andrews
 #'
 #' @examples
-#' regions <- GRanges(seqnames = "chr1", ranges = IRanges(1000, 2000))
+#' library(GenomicRanges)
+#' regions <- GRanges(seqnames = c("chr1", "chr2", "chr3"),
+#'                    start = c(100, 200, 300),
+#'                    end = c(200, 300, 400))
 #' regions$rank_signal <- rnorm(length(regions))
 #' classified_regions <- classify_enhancers(regions, thresh.method = "ROSE")
 classify_enhancers <- function(regions,
@@ -391,9 +497,11 @@ classify_enhancers <- function(regions,
 #' @export
 #'
 #' @examples
+#' \dontrun{
 #' sample.bam <- "path/to/sample.bam"
 #' peaks <- "path/to/peaks.bed"
 #' result <- run_rose(sample.bam, peaks)
+#' }
 run_rose <- function(
     sample.bam,
     peaks,
@@ -412,24 +520,23 @@ run_rose <- function(
     drop.zeros = FALSE,
     first.threshold = 0.5,
     arbitrary.threshold = 0.4) {
-
     if (is.character(sample.bam)) {
         sample.bam <- BamFile(sample.bam)
     }
     message(paste0("Sample BAM file: ", sub(".*/(.*\\.bam)$", "\\1", sample.bam$path)))
 
-    if(length(sample.bam$index) == 0 || !file.exists(sample.bam$index)) {
+    if (length(sample.bam$index) == 0 || !file.exists(sample.bam$index)) {
         message("Sample BAM index not found. Generating an index.")
         sample.bam$index <- unname(indexBam(sample.bam))
     }
 
     if (!is.null(control.bam)) {
-        if(is.character(control.bam)) {
-        control.bam <- BamFile(control.bam)
+        if (is.character(control.bam)) {
+            control.bam <- BamFile(control.bam)
         }
         message(paste0("Control BAM file: ", sub(".*/(.*\\.bam)$", "\\1", control.bam$path)))
 
-        if(length(control.bam$index) == 0 || !file.exists(control.bam$index)) {
+        if (length(control.bam$index) == 0 || !file.exists(control.bam$index)) {
             message("Control BAM index not found. Generating an index.")
             control.bam$index <- unname(indexBam(control.bam))
         }

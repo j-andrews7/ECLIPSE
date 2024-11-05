@@ -46,7 +46,10 @@ Optionally applies user-transformations to the signal before classification, whi
 to ameliorate the effects of outliers on the classification.
 }
 \examples{
-regions <- GRanges(seqnames = "chr1", ranges = IRanges(1000, 2000))
+library(GenomicRanges)
+regions <- GRanges(seqnames = c("chr1", "chr2", "chr3"),
+                   start = c(100, 200, 300),
+                   end = c(200, 300, 400))
 regions$rank_signal <- rnorm(length(regions))
 classified_regions <- classify_enhancers(regions, thresh.method = "ROSE")
 }

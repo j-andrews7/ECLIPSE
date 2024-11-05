@@ -102,9 +102,11 @@ that result in a consistent curve shape with a known maximum, like cumulative pr
 }
 }
 \examples{
+\dontrun{
 sample.bam <- "path/to/sample.bam"
 peaks <- "path/to/peaks.bed"
 result <- run_rose(sample.bam, peaks)
+}
 }
 \author{
 Jared Andrews
