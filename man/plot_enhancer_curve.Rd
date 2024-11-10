@@ -24,10 +24,21 @@ Plots the enhancer ranking curve based on the signal values in the regions,
 with visual indicators for the signal cutoff and the number of super-enhancers identified.
 }
 \examples{
-regions <- GRanges(seqnames = "chr1", ranges = IRanges(1000, 2000))
-regions$rankby_signal <- rnorm(length(regions))
-regions$super <- regions$rankby_signal > 1
-metadata(regions)$threshold <- 1
+library(GenomicRanges)
+
+set.seed(7)
+num_elements <- 1000
+regions <- GRanges(seqnames = rep("chr1", num_elements),
+                   ranges = IRanges(start = seq(1, by = 1000, length.out = num_elements),
+                                    end = seq(1000, by = 1000, length.out = num_elements)))
+
+# Add random signal values and classify as super enhancers
+regions$rankby_signal <- c(rnorm(num_elements - 50, mean = 150, sd = 10), 
+                           rnorm(50, mean = 250, sd = 50))
+regions$super <- regions$rankby_signal > 170
+metadata(regions)$threshold <- 170
+
+# Plot the enhancer curve
 plot_enhancer_curve(regions)
 }
 \author{

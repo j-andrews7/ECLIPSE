@@ -45,30 +45,26 @@ wherein it does not always properly find all overlaps.
 \examples{
 library(GenomicRanges)
 
-# Create example stitched regions
+# Example stitched regions, original peaks, and TSSes
 stitched <- GRanges(seqnames = c("chr1", "chr1", "chr2"),
                     ranges = IRanges(start = c(100, 300, 500),
                     end = c(200, 400, 600)),
                     strand = c("+", "-", "+"))
 
-# Create example original regions
 original <- GRanges(seqnames = c("chr1", "chr1", "chr2", "chr2"),
                     ranges = IRanges(start = c(100, 150, 300, 500),
                     end = c(150, 200, 350, 550)),
                     strand = c("+", "+", "-", "+"))
 
-# Create example TSS regions with gene IDs
 tss <- GRanges(seqnames = c("chr1", "chr1", "chr1", "chr1", "chr2"),
                ranges = IRanges(start = c(120, 140, 160, 320, 520), 
                end = c(130, 150, 170, 330, 530)),
                strand = c("+", "+", "+", "-", "+"),
                GENEID = c("gene1", "gene11", "gene111", "gene2", "gene3"))
 
-# Run the unstitch_regions function
 result <- unstitch_regions(stitched, original, tss, id.col = "GENEID", threshold = 2)
 
-# Print the result
-result
+result$regions
 }
 \author{
 Jared Andrews

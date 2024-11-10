@@ -26,6 +26,7 @@ based on strand orientation.
 library(GenomicRanges)
 regions <- GRanges(seqnames = "chr1", ranges = IRanges(100, 200), strand = "+")
 extended <- extend_reads(regions, upstream = 50, downstream = 100)
+extended
 }
 \author{
 Jared Andrews

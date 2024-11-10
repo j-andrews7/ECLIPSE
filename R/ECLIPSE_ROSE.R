@@ -21,6 +21,7 @@
 #' library(GenomicRanges)
 #' regions <- GRanges(seqnames = "chr1", ranges = IRanges(100, 200), strand = "+")
 #' extended <- extend_reads(regions, upstream = 50, downstream = 100)
+#' extended
 extend_reads <- function(regions, upstream = 0, downstream = 0) {
     pos <- strand(regions) == "+" | strand(regions) == "*"
     ext_start <- start(regions) - ifelse(pos, upstream, downstream)
@@ -71,30 +72,26 @@ extend_reads <- function(regions, upstream = 0, downstream = 0) {
 #' @examples
 #' library(GenomicRanges)
 #' 
-#' # Create example stitched regions
+#' # Example stitched regions, original peaks, and TSSes
 #' stitched <- GRanges(seqnames = c("chr1", "chr1", "chr2"),
 #'                     ranges = IRanges(start = c(100, 300, 500),
 #'                     end = c(200, 400, 600)),
 #'                     strand = c("+", "-", "+"))
 #' 
-#' # Create example original regions
 #' original <- GRanges(seqnames = c("chr1", "chr1", "chr2", "chr2"),
 #'                     ranges = IRanges(start = c(100, 150, 300, 500),
 #'                     end = c(150, 200, 350, 550)),
 #'                     strand = c("+", "+", "-", "+"))
 #' 
-#' # Create example TSS regions with gene IDs
 #' tss <- GRanges(seqnames = c("chr1", "chr1", "chr1", "chr1", "chr2"),
 #'                ranges = IRanges(start = c(120, 140, 160, 320, 520), 
 #'                end = c(130, 150, 170, 330, 530)),
 #'                strand = c("+", "+", "+", "-", "+"),
 #'                GENEID = c("gene1", "gene11", "gene111", "gene2", "gene3"))
 #' 
-#' # Run the unstitch_regions function
 #' result <- unstitch_regions(stitched, original, tss, id.col = "GENEID", threshold = 2)
 #' 
-#' # Print the result
-#' result
+#' result$regions
 unstitch_regions <- function(stitched, original, tss, id.col = "GENEID", threshold = 2) {
     # Find overlaps between stitched regions and TSS regions
     overlaps <- findOverlaps(stitched, tss)
@@ -285,11 +282,11 @@ add_region_signal <- function(sample.bam,
 #' @examples
 #' library(GenomicRanges)
 #' regions <- GRanges(seqnames = c("chr1", "chr2", "chr3"),
-#'                    start = c(100, 200, 300),
-#'                    end = c(200, 300, 400))
+#'                    ranges = IRanges(start = c(100, 200, 300),
+#'                    end = c(200, 300, 400)))
 #' regions$sample_signal <- rnorm(length(regions))
 #' regions$control_signal <- rnorm(length(regions))
-#' ranked_regions <- get_ranking_signal(regions)
+#' ranked_regions <- add_signal_rank(regions)
 add_signal_rank <- function(regions, negative.to.zero = TRUE) {
     if (is.null(regions$sample_signal)) {
         stop("regions must contain signal, run 'get_region_signal'")
@@ -350,8 +347,8 @@ add_signal_rank <- function(regions, negative.to.zero = TRUE) {
 #' @examples
 #' library(GenomicRanges)
 #' regions <- GRanges(seqnames = c("chr1", "chr2", "chr3"),
-#'                    start = c(100, 200, 300),
-#'                    end = c(200, 300, 400))
+#'                    ranges = IRanges(start = c(100, 200, 300),
+#'                                      end = c(200, 300, 400)))
 #' regions$rank_signal <- rnorm(length(regions))
 #' classified_regions <- classify_enhancers(regions, thresh.method = "ROSE")
 classify_enhancers <- function(regions,
