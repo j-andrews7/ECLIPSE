@@ -85,7 +85,7 @@ calculate_cutoff <- function(inputVector, drawPlot = TRUE, ...) {
 #'
 #' @keywords internal
 #' @author Young Lab, with documentation by Jared Andrews
-#' @rdname INTERNAL_calculate_cutoff
+#' @rdname INTERNAL_numPts_below_line
 numPts_below_line <- function(myVector, slope, x) {
     yPt <- myVector[x]
     b <- yPt - (slope * x)
