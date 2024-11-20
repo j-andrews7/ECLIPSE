@@ -5,15 +5,15 @@
 \title{Run ROSE (Rank Ordering of Super-Enhancers)}
 \usage{
 run_rose(
-  sample.bam,
+  treatment,
   peaks,
-  control.bam = NULL,
+  control = NULL,
   stitch.distance = 12500,
-  exclude.tss.distance = 0,
+  tss.exclusion.distance = 0,
   txdb = NULL,
   org.db = NULL,
   drop.y = TRUE,
-  max.genes.overlap = 2,
+  max.unique.gene.tss.overlap = 2,
   negative.to.zero = TRUE,
   thresh.method = "ROSE",
   transformation = NULL,
@@ -25,30 +25,32 @@ run_rose(
 )
 }
 \arguments{
-\item{sample.bam}{A character string or \code{BamFile} object representing the sample BAM file.}
+\item{treatment}{A character string or \code{BamFile} object representing the sample BAM file.}
 
 \item{peaks}{A character string or \code{GRanges} object representing the peaks.}
 
-\item{control.bam}{A character string or \code{BamFile} object representing the control BAM file.
+\item{control}{A character string or \code{BamFile} object representing the control BAM file.
 Default is \code{NULL}.}
 
 \item{stitch.distance}{Numeric value for the distance within which peaks are stitched together.
 Default is 12500.}
 
-\item{exclude.tss.distance}{Numeric value for distance from TSS to exclude peaks prior to stitching.
+\item{tss.exclusion.distance}{Numeric value for distance to add to TSS exclusion range prior to stitching.
+Peaks \emph{fully contained} within this exclusion range will be excluded from the stitching process.
 Default is 0, meaning peaks overlapping TSS will not be excluded from stitching.}
 
-\item{txdb}{Not used. Functionality not implemented.
-Default is \code{NULL}.}
+\item{txdb}{Transcript annotations used for peak exclusion for TSS overlap and unstitching process for
+regions spanning TSSes from more than \code{max.unique.gene.tss.overlap} genes.}
 
 \item{org.db}{Not used. Functionality not implemented.
 Default is \code{NULL}.}
 
-\item{drop.y}{Logical indicating whether to drop peaks on chromosome Y.
+\item{drop.y}{Logical indicating whether to drop peaks on chromosome Y, as done by the original ROSE implementation.
 Default is \code{TRUE}.}
 
-\item{max.genes.overlap}{Not used. Functionality not implemented.
-Default is 2.}
+\item{max.unique.gene.tss.overlap}{Maximum number of unique genes that a region can overlap the TSS of before being unstitched.
+Note that multiple overlapping regions from the same gene, e.g. multiple isoforms, are counted as one.
+Default is 2. Ignored if \code{txdb} is \code{NULL}.}
 
 \item{negative.to.zero}{Logical indicating whether to set negative ranking signals to zero.
 Default is \code{TRUE}.}
@@ -64,7 +66,7 @@ Default is \code{NULL}.}
 Default is 1.}
 
 \item{read.ext}{Numeric value for extending reads downstream.
-Default is 200.}
+Default is 200. Ignored if inputs are \code{GRanges} objects.}
 
 \item{drop.zeros}{Logical indicating whether to drop regions with zero signal.
 Default is \code{FALSE}.}

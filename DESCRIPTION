@@ -8,7 +8,6 @@ Authors@R: c(
     person("Kelly", "McCastlain", role = "aut"),
     person("Jacqueline", "Myers", role = "aut"),
     person("Nicolas", "Peterson", role = "aut"),
-    person("Avery", "Bradley", role = "aut"),
     person("Young Lab - Whitehead Institute for Biomedical Research", role = "cph",
     comment = "Author of included original ROSE thresholding code."))
 Description: ECLIPSE provides a performant implementation of the rank ordering of super enhancers (ROSE) method for identifying super enhancers.

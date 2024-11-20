@@ -449,33 +449,35 @@ classify_enhancers <- function(regions,
 #' - The "arbitrary" method allows for the user to specify a fixed threshold, useful for transformations
 #'   that result in a consistent curve shape with a known maximum, like cumulative proportion of signal.
 #'
-#' @param sample.bam A character string or `BamFile` object representing the sample BAM file.
+#' @param treatment A character string or `BamFile` object representing the sample BAM file.
 #' @param peaks A character string or `GRanges` object representing the peaks.
-#' @param control.bam A character string or `BamFile` object representing the control BAM file.
+#' @param control A character string or `BamFile` object representing the control BAM file.
 #'   Default is `NULL`.
 #' @param stitch.distance Numeric value for the distance within which peaks are stitched together.
 #'   Default is 12500.
-#' @param exclude.tss.distance Numeric value for distance from TSS to exclude peaks prior to stitching.
+#' @param tss.exclusion.distance Numeric value for distance to add to TSS exclusion range prior to stitching.
+#'   Peaks *fully contained* within this exclusion range will be excluded from the stitching process.
 #'   Default is 0, meaning peaks overlapping TSS will not be excluded from stitching.
-#' @param txdb Not used. Functionality not implemented.
-#'   Default is `NULL`.
+#' @param txdb Transcript annotations used for peak exclusion for TSS overlap and unstitching process for 
+#'   regions spanning TSSes from more than `max.unique.gene.tss.overlap` genes.
 #' @param org.db Not used. Functionality not implemented.
 #'   Default is `NULL`.
-#' @param drop.y Logical indicating whether to drop peaks on chromosome Y.
+#' @param drop.y Logical indicating whether to drop peaks on chromosome Y, as done by the original ROSE implementation.
 #'   Default is `TRUE`.
-#' @param max.genes.overlap Not used. Functionality not implemented.
-#'   Default is 2.
+#' @param max.unique.gene.tss.overlap Maximum number of unique genes that a region can overlap the TSS of before being unstitched.
+#'   Note that multiple overlapping regions from the same gene, e.g. multiple isoforms, are counted as one.
+#'   Default is 2. Ignored if `txdb` is `NULL`.
 #' @param negative.to.zero Logical indicating whether to set negative ranking signals to zero.
 #'   Default is `TRUE`.
 #' @param thresh.method Character string specifying the method to determine the signal threshold.
 #'   Must be one of "ROSE", "first", "curvature", or "arbitrary".
-#' Default is "ROSE".
+#'   Default is "ROSE".
 #' @param transformation A function to apply to the ranking signal before threshold determination.
 #'   Default is `NULL`.
 #' @param floor Numeric value representing the minimum coverage threshold to count.
 #'  Default is 1.
 #' @param read.ext Numeric value for extending reads downstream.
-#'   Default is 200.
+#'   Default is 200. Ignored if inputs are `GRanges` objects.
 #' @param drop.zeros Logical indicating whether to drop regions with zero signal.
 #'   Default is `FALSE`.
 #' @param first.threshold Numeric value for the fraction of steepest slope when using the "first" threshold method.
@@ -490,6 +492,8 @@ classify_enhancers <- function(regions,
 #' @importFrom Rsamtools BamFile indexBam
 #' @importFrom genomation readBed
 #' @importFrom GenomicRanges reduce seqnames trim
+#' @importFrom S4Vectors queryHits
+#' @importFrom IRanges findOverlaps
 #'
 #' @export
 #'
@@ -500,15 +504,15 @@ classify_enhancers <- function(regions,
 #' result <- run_rose(sample.bam, peaks)
 #' }
 run_rose <- function(
-    sample.bam,
+    treatment,
     peaks,
-    control.bam = NULL,
+    control = NULL,
     stitch.distance = 12500,
-    exclude.tss.distance = 0,
-    txdb = NULL, # Not used/functionality not implemented
+    tss.exclusion.distance = 0,
+    txdb = NULL, 
     org.db = NULL, # Not used/functionality not implemented
     drop.y = TRUE,
-    max.genes.overlap = 2, # Not used/functionality not implemented
+    max.unique.gene.tss.overlap = 2, 
     negative.to.zero = TRUE,
     thresh.method = "ROSE",
     transformation = NULL,
@@ -517,25 +521,26 @@ run_rose <- function(
     drop.zeros = FALSE,
     first.threshold = 0.5,
     arbitrary.threshold = 0.4) {
-    if (is.character(sample.bam)) {
-        sample.bam <- BamFile(sample.bam)
-    }
-    message(paste0("Sample BAM file: ", sub(".*/(.*\\.bam)$", "\\1", sample.bam$path)))
 
-    if (length(sample.bam$index) == 0 || !file.exists(sample.bam$index)) {
+    if (is.character(treatment)) {
+        treatment <- BamFile(treatment)
+    }
+    message(paste0("Sample BAM file: ", sub(".*/(.*\\.bam)$", "\\1", treatment$path)))
+
+    if (length(treatment$index) == 0 || !file.exists(treatment$index)) {
         message("Sample BAM index not found. Generating an index.")
-        sample.bam$index <- unname(indexBam(sample.bam))
+        treatment$index <- unname(indexBam(treatment))
     }
 
-    if (!is.null(control.bam)) {
-        if (is.character(control.bam)) {
-            control.bam <- BamFile(control.bam)
+    if (!is.null(control)) {
+        if (is.character(control)) {
+            control <- BamFile(control)
         }
-        message(paste0("Control BAM file: ", sub(".*/(.*\\.bam)$", "\\1", control.bam$path)))
+        message(paste0("Control BAM file: ", sub(".*/(.*\\.bam)$", "\\1", control$path)))
 
-        if (length(control.bam$index) == 0 || !file.exists(control.bam$index)) {
+        if (length(control$index) == 0 || !file.exists(control$index)) {
             message("Control BAM index not found. Generating an index.")
-            control.bam$index <- unname(indexBam(control.bam))
+            control$index <- unname(indexBam(control))
         }
     }
 
@@ -545,6 +550,20 @@ run_rose <- function(
         peaks <- trim(peaks)
     }
 
+    if (tss.exclusion.distance > 0) {
+        message("Excluding peaks within TSS exclusion distance of ", tss.exclusion.distance)
+        tss <- promoters(txdb, upstream = tss.exclusion.distance, downstream = tss.exclusion.distance, columns = "GENEID")
+
+        # Create susbset of stitched peaks that do not overlap TSS and remove
+        overlaps <- findOverlaps(peaks, tss, type = "within")
+
+        contained_indices <- queryHits(overlaps)
+
+        message(length(contained_indices), " peaks fully contained within TSS exclusion distance and will be excluded from stitching")
+        peaks <- peaks[-unique(contained_indices)]
+    }
+
+    message("Stitching peaks with stitch distance of ", stitch.distance)
     peaks_stitched <- reduce(peaks, min.gapwidth = stitch.distance)
 
     # Drop chrY as ROSE does
@@ -552,8 +571,8 @@ run_rose <- function(
         peaks_stitched <- peaks_stitched[seqnames(peaks_stitched) != "chrY"]
     }
 
-    message("Calculating normalized region signal")
-    regions <- add_region_signal(sample.bam, peaks_stitched, control.bam = control.bam, floor = floor, read.ext = read.ext)
+    message("Calculating normalized signal for ", length(peaks_stitched)," stitched regions")
+    regions <- add_region_signal(treatment, peaks_stitched, control.bam = control, floor = floor, read.ext = read.ext)
 
     message("Ranking regions")
     regions <- add_signal_rank(regions, negative.to.zero = negative.to.zero)
