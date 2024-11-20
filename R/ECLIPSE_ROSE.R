@@ -572,7 +572,7 @@ run_rose <- function(
         peaks_stitched <- peaks_stitched[seqnames(peaks_stitched) != "chrY"]
     }
 
-    if (tss.exclusion.distance > 0 & max.unique.gene.tss.overlap > 0) {
+    if (tss.exclusion.distance > 0 && max.unique.gene.tss.overlap > 0) {
         message("Unstitching regions overlapping TSS from more than ", max.unique.gene.tss.overlap, " unique genes")
         unstitched <- unstitch_regions(peaks_stitched, peaks, tss, threshold = max.unique.gene.tss.overlap)
         peaks_stitched <- unstitched$regions
