@@ -7,11 +7,11 @@
 unstitch_regions(stitched, original, tss, id.col = "GENEID", threshold = 2)
 }
 \arguments{
-\item{stitched}{A `GRanges`` object representing the stitched regions.}
+\item{stitched}{A \code{GRanges} object representing the stitched regions.}
 
-\item{original}{A `GRanges`` object representing the original regions prior to stitching.}
+\item{original}{A \code{GRanges} object representing the original regions prior to stitching.}
 
-\item{tss}{A `GRanges`` object representing the TSS regions.}
+\item{tss}{A \code{GRanges} object representing the TSS regions.}
 
 \item{id.col}{A character string specifying the column name in the TSS object that contains gene IDs.
 Default is "GENEID".}

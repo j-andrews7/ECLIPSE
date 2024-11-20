@@ -3,13 +3,13 @@
 #' Extends reads by a specified number of bases upstream or downstream
 #' based on strand orientation.
 #'
-#' @param regions A GRanges object containing genomic regions.
+#' @param regions A `GRanges` object containing genomic regions.
 #' @param upstream Number of bases to extend upstream. 
 #'   Default is 0.
 #' @param downstream Number of bases to extend downstream. 
 #'   Default is 0.
 #'
-#' @return A GRanges object with extended regions.
+#' @return A `GRanges` object with extended regions.
 #'
 #' @export
 #' @importFrom GenomicRanges strand start end 'ranges<-'
@@ -41,9 +41,9 @@ extend_reads <- function(regions, upstream = 0, downstream = 0) {
 #' This attempts to emulate the method used by ROSE, but the results it returns are not identical due to a presumed bug in ROSE
 #' wherein it does not always properly find all overlaps.
 #'
-#' @param stitched A `GRanges`` object representing the stitched regions.
-#' @param original A `GRanges`` object representing the original regions prior to stitching.
-#' @param tss A `GRanges`` object representing the TSS regions.
+#' @param stitched A `GRanges` object representing the stitched regions.
+#' @param original A `GRanges` object representing the original regions prior to stitching.
+#' @param tss A `GRanges` object representing the TSS regions.
 #' @param id.col A character string specifying the column name in the TSS object that contains gene IDs. 
 #'   Default is "GENEID".
 #' @param threshold An integer specifying the threshold for the number of unique genes before unstitching is applied. 
@@ -568,7 +568,16 @@ run_rose <- function(
 
     # Drop chrY as ROSE does
     if (drop.y) {
+        message("Dropped ", length(which(seqnames(peaks_stitched) == "chrY")), " peaks on chrY")
         peaks_stitched <- peaks_stitched[seqnames(peaks_stitched) != "chrY"]
+    }
+
+    if (tss.exclusion.distance > 0 & max.unique.gene.tss.overlap > 0) {
+        message("Unstitching regions overlapping TSS from more than ", max.unique.gene.tss.overlap, " unique genes")
+        unstitched <- unstitch_regions(peaks_stitched, peaks, tss, threshold = max.unique.gene.tss.overlap)
+        peaks_stitched <- unstitched$regions
+        hits <- unstitched$hits
+        message("Unstitched ", sum(hits$unstitch), " regions")
     }
 
     message("Calculating normalized signal for ", length(peaks_stitched)," stitched regions")

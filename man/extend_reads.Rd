@@ -7,7 +7,7 @@
 extend_reads(regions, upstream = 0, downstream = 0)
 }
 \arguments{
-\item{regions}{A GRanges object containing genomic regions.}
+\item{regions}{A \code{GRanges} object containing genomic regions.}
 
 \item{upstream}{Number of bases to extend upstream.
 Default is 0.}
@@ -16,7 +16,7 @@ Default is 0.}
 Default is 0.}
 }
 \value{
-A GRanges object with extended regions.
+A \code{GRanges} object with extended regions.
 }
 \description{
 Extends reads by a specified number of bases upstream or downstream
