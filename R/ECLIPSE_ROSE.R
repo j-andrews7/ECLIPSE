@@ -591,8 +591,9 @@ run_rose <- function(
 
     # Drop chrY as ROSE does
     if (drop.y) {
-        message("Dropped ", length(which(seqnames(peaks_stitched) == "chrY")), " peaks on chrY")
-        peaks_stitched <- peaks_stitched[seqnames(peaks_stitched) != "chrY"]
+        peaks.chr <- as.vector(seqnames(peaks_stitched))
+        message("Dropped ", length(which(peaks.chr == "chrY")), " peaks on chrY")
+        peaks_stitched <- peaks_stitched[peaks.chr != "chrY"]
     }
 
     if (tss.exclusion.distance > 0 && max.unique.gene.tss.overlap > 0) {
