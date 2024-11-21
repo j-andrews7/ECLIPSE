@@ -21,7 +21,13 @@ run_rose(
   read.ext = 200,
   drop.zeros = FALSE,
   first.threshold = 0.5,
-  arbitrary.threshold = 0.4
+  arbitrary.threshold = 0.4,
+  annotate = TRUE,
+  annotate.dist = 50000,
+  promoter.dist = c(2000, 200),
+  active.genes = NULL,
+  identify.active.genes = FALSE,
+  omit.unkown = TRUE
 )
 }
 \arguments{
@@ -40,9 +46,9 @@ Peaks \emph{fully contained} within this exclusion range will be excluded from t
 Default is 0, meaning peaks overlapping TSS will not be excluded from stitching.}
 
 \item{txdb}{Transcript annotations used for peak exclusion for TSS overlap and unstitching process for
-regions spanning TSSes from more than \code{max.unique.gene.tss.overlap} genes.}
+regions spanning TSSes from more than \code{max.unique.gene.tss.overlap} genes. Also used for enhancer annotation.}
 
-\item{org.db}{Not used. Functionality not implemented.
+\item{org.db}{An \code{OrgDb} object containing organism database information. Used for enhancer annotation.
 Default is \code{NULL}.}
 
 \item{drop.y}{Logical indicating whether to drop peaks on chromosome Y, as done by the original ROSE implementation.
@@ -76,6 +82,28 @@ Default is 0.5.}
 
 \item{arbitrary.threshold}{Numeric value for the arbitrary threshold if the "arbitrary" method is selected.
 Default is 0.4.}
+
+\item{annotate}{Logical indicating whether annotations should be provided.
+Default is \code{TRUE}.}
+
+\item{annotate.dist}{Numeric specifying the flanking distance (in bp) around the region to annotate.
+Default is 50000.}
+
+\item{promoter.dist}{Integer vector of length 2, where first and second values are upstream/downstream
+distances (in bp) from the transcription start site. Used to specify the promoter region for annotations
+and determining active genes.
+Default is \code{c(2000, 200)}.}
+
+\item{active.genes}{Character vector of gene \emph{symbols} to retain in the annotations.
+Default is \code{NULL}.}
+
+\item{identify.active.genes}{Logical indicating whether active genes should be identified based on
+overlaps with \code{peaks}. Cannot be used simultaneously with \code{active.genes}.
+Default is \code{FALSE}.}
+
+\item{omit.unkown}{Logical indicating whether uncharacterized genes (i.e., gene symbols starting with \emph{LOC})
+should be excluded from annotations.
+Default is \code{TRUE}.}
 }
 \value{
 A \code{GRanges} object containing the classified super-enhancers and associated metadata.
@@ -112,4 +140,6 @@ result <- run_rose(sample.bam, peaks)
 }
 \author{
 Jared Andrews
+
+Nicolas Peterson
 }
