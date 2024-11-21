@@ -458,9 +458,9 @@ classify_enhancers <- function(regions,
 #' @param tss.exclusion.distance Numeric value for distance to add to TSS exclusion range prior to stitching.
 #'   Peaks *fully contained* within this exclusion range will be excluded from the stitching process.
 #'   Default is 0, meaning peaks overlapping TSS will not be excluded from stitching.
-#' @param txdb Transcript annotations used for peak exclusion for TSS overlap and unstitching process for 
-#'   regions spanning TSSes from more than `max.unique.gene.tss.overlap` genes.
-#' @param org.db Not used. Functionality not implemented.
+#' @param txdb Transcript annotations used for peak exclusion for TSS overlap and unstitching process for
+#'   regions spanning TSSes from more than `max.unique.gene.tss.overlap` genes. Also used for enhancer annotation.
+#' @param org.db An `OrgDb` object containing organism database information. Used for enhancer annotation.
 #'   Default is `NULL`.
 #' @param drop.y Logical indicating whether to drop peaks on chromosome Y, as done by the original ROSE implementation.
 #'   Default is `TRUE`.
@@ -484,10 +484,27 @@ classify_enhancers <- function(regions,
 #'   Default is 0.5.
 #' @param arbitrary.threshold Numeric value for the arbitrary threshold if the "arbitrary" method is selected.
 #'   Default is 0.4.
+#' @param annotate Logical indicating whether annotations should be provided.
+#'   Default is `TRUE`.
+#' @param annotate.dist Numeric specifying the flanking distance (in bp) around the region to annotate.
+#'   Default is 50000.
+#' @param promoter.dist Integer vector of length 2, where first and second values are upstream/downstream
+#'   distances (in bp) from the transcription start site. Used to specify the promoter region for annotations
+#'   and determining active genes.
+#'   Default is `c(2000, 200)`.
+#' @param active.genes Character vector of gene *symbols* to retain in the annotations.
+#'   Default is `NULL`.
+#' @param identify.active.genes Logical indicating whether active genes should be identified based on
+#'   overlaps with `peaks`. Cannot be used simultaneously with `active.genes`.
+#'   Default is `FALSE`.
+#' @param omit.unkown Logical indicating whether uncharacterized genes (i.e., gene symbols starting with *LOC*)
+#'   should be excluded from annotations.
+#'   Default is `TRUE`.
 #'
 #' @return A `GRanges` object containing the classified super-enhancers and associated metadata.
 #'
 #' @author Jared Andrews
+#' @author Nicolas Peterson
 #'
 #' @importFrom Rsamtools BamFile indexBam
 #' @importFrom genomation readBed
@@ -509,10 +526,10 @@ run_rose <- function(
     control = NULL,
     stitch.distance = 12500,
     tss.exclusion.distance = 0,
-    txdb = NULL, 
-    org.db = NULL, # Not used/functionality not implemented
+    txdb = NULL,
+    org.db = NULL,
     drop.y = TRUE,
-    max.unique.gene.tss.overlap = 2, 
+    max.unique.gene.tss.overlap = 2,
     negative.to.zero = TRUE,
     thresh.method = "ROSE",
     transformation = NULL,
@@ -520,7 +537,13 @@ run_rose <- function(
     read.ext = 200,
     drop.zeros = FALSE,
     first.threshold = 0.5,
-    arbitrary.threshold = 0.4) {
+    arbitrary.threshold = 0.4,
+    annotate = TRUE,
+    annotate.dist = 50000,
+    promoter.dist = c(2000, 200),
+    active.genes = NULL,
+    identify.active.genes = FALSE,
+    omit.unkown = TRUE) {
 
     if (is.character(treatment)) {
         treatment <- BamFile(treatment)
@@ -591,6 +614,13 @@ run_rose <- function(
         transformation = transformation, drop.zeros = drop.zeros,
         thresh.method = thresh.method, first.threshold = first.threshold, arbitrary.threshold = arbitrary.threshold
     )
+
+    if(annotate) {
+        message("Annotating regions")
+        regions <- annotate_enhancers(regions, peaks, tx.db = txdb, org.db = org.db, annotate.dist = annotate.dist,
+                                      promoter.dist = promoter.dist, active.genes = active.genes,
+                                      identify.active.genes = identify.active.genes, omit.unknown = omit.unkown)
+    }
 
     regions
 }
