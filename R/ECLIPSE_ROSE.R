@@ -587,7 +587,7 @@ run_rose <- function(
             stop("txdb must be provided if max.unique.gene.tss.overlap is not NULL")
         }
 
-        tss <- promoters(txdb, upstream = 50, downstream = 50, columns = "GENEID")
+        tss <- promoters(txdb, upstream = tss.overlap.distance, downstream = tss.overlap.distance, columns = "GENEID")
         message("Unstitching regions overlapping TSS from more than ", max.unique.gene.tss.overlap, " unique genes")
         unstitched <- unstitch_regions(peaks_stitched, peaks, tss, threshold = max.unique.gene.tss.overlap)
         peaks_stitched <- unstitched$regions
