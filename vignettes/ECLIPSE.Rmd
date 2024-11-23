@@ -118,15 +118,39 @@ What is less well documented in the original ROSE implementation is that this al
 The original implementation provides no way to alter or disable this behavior, but ECLIPSE does.
 
 ```{r}
+library(TxDb.Hsapiens.UCSC.hg38.knownGene)
+txdb <- TxDb.Hsapiens.UCSC.hg38.knownGene
+
 # With TSS exclusion and unstitching, a la the original ROSE implementation
-putative_enhancers_tss_exl <- run_rose(treatment = treat_path, 
-                                       control = control_path, 
-                                       peaks = peaks_path,
-                                       txdb = ,
-                                       tss.exclusion.distance = 12500,
-                                       max.unique.gene.tss.overlap = 2)
+res_tss_exl <- run_rose(treatment = treat_path, 
+                        control = control_path, 
+                        peaks = peaks_path,
+                        txdb = txdb,
+                        tss.exclusion.distance = 2500,
+                        max.unique.gene.tss.overlap = 2)
+
+# With TSS exclusion but no unstitching
+res_tss_exl_no_unstitch <- run_rose(treatment = treat_path, 
+                                    control = control_path, 
+                                    peaks = peaks_path,
+                                    txdb = txdb,
+                                    tss.exclusion.distance = 2500,
+                                    max.unique.gene.tss.overlap = NULL)
 ```
 
+We can then see how these differ in the number of SEs identified.
+
+With TSS exclusion and unstitching, as is commonly done with the original implementation for H3K27ac data:
+
+```{r}
+plot_enhancer_curve(res_tss_exl, factor_label = "H3K27ac")
+```
+
+With TSS exclusion but no unstitching:
+
+```{r}
+plot_enhancer_curve(res_tss_exl_no_unstitch, factor_label = "H3K27ac")
+```
 
 ## SessionInfo
 

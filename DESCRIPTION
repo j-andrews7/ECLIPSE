@@ -39,7 +39,8 @@ Suggests:
     knitr,
     testthat (>= 3.0.0),
     rmarkdown,
-    BiocFileCache
+    BiocFileCache,
+    TxDb.Hsapiens.UCSC.hg38.knownGene
 Depends:
     R (>= 4.4.0)
 biocViews: 
