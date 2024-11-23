@@ -466,7 +466,9 @@ classify_enhancers <- function(regions,
 #'   Default is `TRUE`.
 #' @param max.unique.gene.tss.overlap Maximum number of unique genes that a region can overlap the TSS of before being unstitched.
 #'   Note that multiple overlapping regions from the same gene, e.g. multiple isoforms, are counted as one.
-#'   Default is 2. Ignored if `txdb` is `NULL`.
+#'   Default is `NULL`. Ignored if `txdb` is `NULL`.
+#' @param tss.overlap.distance Numeric value for the distance (in bp) to add to TSS for unstitching.
+#'   Default is 50. Ignored if `txdb` is `NULL`.
 #' @param negative.to.zero Logical indicating whether to set negative ranking signals to zero.
 #'   Default is `TRUE`.
 #' @param thresh.method Character string specifying the method to determine the signal threshold.
@@ -492,6 +494,7 @@ classify_enhancers <- function(regions,
 #' @importFrom Rsamtools BamFile indexBam
 #' @importFrom genomation readBed
 #' @importFrom GenomicRanges reduce seqnames trim
+#' @importFrom GenomeInfoDb keepSeqlevels dropSeqlevels
 #' @importFrom S4Vectors queryHits
 #' @importFrom IRanges findOverlaps
 #'
@@ -509,10 +512,11 @@ run_rose <- function(
     control = NULL,
     stitch.distance = 12500,
     tss.exclusion.distance = 0,
-    txdb = NULL, 
+    txdb = NULL,
     org.db = NULL, # Not used/functionality not implemented
     drop.y = TRUE,
-    max.unique.gene.tss.overlap = 2, 
+    max.unique.gene.tss.overlap = NULL,
+    tss.overlap.distance = 50,
     negative.to.zero = TRUE,
     thresh.method = "ROSE",
     transformation = NULL,
@@ -551,6 +555,10 @@ run_rose <- function(
     }
 
     if (tss.exclusion.distance > 0) {
+        if (is.null(txdb)) {
+            stop("txdb must be provided if tss.exclusion.distance is greater than 0")
+        }
+
         message("Excluding peaks within TSS exclusion distance of ", tss.exclusion.distance)
         tss <- promoters(txdb, upstream = tss.exclusion.distance, downstream = tss.exclusion.distance, columns = "GENEID")
 
@@ -568,11 +576,18 @@ run_rose <- function(
 
     # Drop chrY as ROSE does
     if (drop.y) {
-        message("Dropped ", length(which(seqnames(peaks_stitched) == "chrY")), " peaks on chrY")
+        y_regions <- keepSeqlevels(peaks_stitched, "chrY", pruning.mode="coarse")
+        peaks_stitched <- dropSeqlevels(peaks_stitched, "chrY", pruning.mode="coarse")
+        message("Dropped ", length(y_regions), " regions on chrY")
         peaks_stitched <- peaks_stitched[seqnames(peaks_stitched) != "chrY"]
     }
 
-    if (tss.exclusion.distance > 0 && max.unique.gene.tss.overlap > 0) {
+    if (!is.null(max.unique.gene.tss.overlap)) {
+        if (is.null(txdb)) {
+            stop("txdb must be provided if max.unique.gene.tss.overlap is not NULL")
+        }
+
+        tss <- promoters(txdb, upstream = 50, downstream = 50, columns = "GENEID")
         message("Unstitching regions overlapping TSS from more than ", max.unique.gene.tss.overlap, " unique genes")
         unstitched <- unstitch_regions(peaks_stitched, peaks, tss, threshold = max.unique.gene.tss.overlap)
         peaks_stitched <- unstitched$regions
