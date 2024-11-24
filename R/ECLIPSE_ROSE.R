@@ -567,7 +567,7 @@ run_rose <- function(
 
         contained_indices <- queryHits(overlaps)
 
-        message(length(contained_indices), " peaks fully contained within TSS exclusion distance and will be excluded from stitching")
+        message(length(contained_indices), " peaks fully contained within TSS exclusion window and will be excluded from stitching")
         peaks <- peaks[-unique(contained_indices)]
     }
 

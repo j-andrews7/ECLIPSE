@@ -119,7 +119,7 @@ The original implementation provides no way to alter or disable this behavior, b
 
 ```{r}
 library(TxDb.Hsapiens.UCSC.hg38.knownGene)
-txdb <- TxDb.Hsapiens.UCSC.hg38.knownGene
+#txdb <- TxDb.Hsapiens.UCSC.hg38.knownGene
 
 # With TSS exclusion and unstitching, a la the original ROSE implementation
 res_tss_exl <- run_rose(treatment = treat_path, 
@@ -151,6 +151,24 @@ With TSS exclusion but no unstitching:
 ```{r}
 plot_enhancer_curve(res_tss_exl_no_unstitch, factor_label = "H3K27ac")
 ```
+
+These settings have dramatic impacts on the final number of regions returned and the number (and size) of SEs identified.
+
+```{r}
+message("Number of regions returned with TSS exclusion and unstitching: ", length(res_tss_exl))
+message("Number of regions returned with TSS exclusion and no unstitching: ", length(res_tss_exl))
+
+message("Number of SEs identified with TSS exclusion and unstitching: ", length(res_tss_exl[res_tss_exl$super]))
+message("Number of SEs identified with TSS exclusion and no unstitching: ", length(res_tss_exl_no_unstitch[res_tss_exl_no_unstitch$super]))
+
+message("Average width of SEs with TSS exclusion and unstitching: ", mean(width(res_tss_exl[res_tss_exl$super])))
+message("Average width of SEs with TSS exclusion and no unstitching: ", mean(width(res_tss_exl_no_unstitch[res_tss_exl_no_unstitch$super])))
+```
+
+
+Given the lack of documentation or discussion on this behavior in the original implementation or papers, it is unclear how this should be handled in practice.
+
+
 
 ## SessionInfo
 
