@@ -33,14 +33,17 @@ Imports:
     S4Vectors,
     stats,
     KneeArrower,
-    GenomeInfoDb
+    GenomeInfoDb,
+    Gviz
 Suggests:
     BiocStyle,
     knitr,
     testthat (>= 3.0.0),
     rmarkdown,
     BiocFileCache,
-    TxDb.Hsapiens.UCSC.hg38.knownGene
+    TxDb.Hsapiens.UCSC.hg38.knownGene,
+    DESeq2,
+    apeglm
 Depends:
     R (>= 4.4.0)
 biocViews: 

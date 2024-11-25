@@ -66,9 +66,9 @@ control_path <- bfcrpath(bfc, control_url)
 peaks_url <- "https://www.encodeproject.org/files/ENCFF590DFY/@@download/ENCFF590DFY.bed.gz"
 peaks_path <- bfcrpath(bfc, peaks_url)
 
-putative_enhancers <- run_rose(treatment = treat_path, control = control_path, peaks = peaks_path)
+naiveB1_enhancers <- run_rose(treatment = treat_path, control = control_path, peaks = peaks_path)
 
-putative_enhancers
+naiveB1_enhancers
 ```
 
 ### Other Input Types
@@ -80,7 +80,7 @@ Though the example above uses BAM files, `run_rose` can also accept BigWig or be
 Can't be a super enhancer package without the classic swoosh plot.
 
 ```{r}
-plot_enhancer_curve(putative_enhancers, factor_label = "H3K27ac")
+plot_enhancer_curve(naiveB1_enhancers, factor_label = "H3K27ac")
 ```
 
 
@@ -96,14 +96,6 @@ knitr::include_graphics("ENCFF590DFY_Plot_points.png")
 ```
 
 These results are using no TSS exclusion to compare the underlying classification approach as closely as possible.
-
-Here is the enhancer ranking curve returned from ECLIPSE after `run_rose` on the same data:
-
-```{r}
-library(ECLIPSE)
-data("ENCSR660EVU_putative_enhancers", package = "ECLIPSE")
-plot_enhancer_curve(ENCSR660EVU_putative_enhancers)
-```
 
 Notably, the number of super-enhancers identified are not a perfect match due to very slight differences in the coverage calculations.
 However, all super-enhancers identified in the original implementation are also called by ECLIPSE.
@@ -168,7 +160,199 @@ message("Average width of SEs with TSS exclusion and no unstitching: ", mean(wid
 
 Given the lack of documentation or discussion on this behavior in the original implementation or papers, it is unclear how this should be handled in practice.
 
+## Differential Sub-Structural Analysis
 
+ECLIPSE also provides functionality to identify sub-structural changes within super enhancer regions between groups via differential analysis of small bins.
+
+For this example, we'll compare naive B cells and activated B cells from ENCODE.
+These groups have enough similarities to demonstrate how this analysis looks for similar regions, but also enough changes in SE structure to be interesting.
+
+### Call Activated B Cell Super Enhancers
+
+We'll also want the SEs from activated B cells so that we have all the SE regions between the groups included for comparison.
+This is also useful for classification of SE structure changes between groups (see below).
+
+```{r}
+actB1_url <- "https://www.encodeproject.org/files/ENCFF640GBC/@@download/ENCFF640GBC.bam"
+actB1_path <- bfcrpath(bfc, actB1_url)
+
+control_actB1_url <- "https://www.encodeproject.org/files/ENCFF391WGD/@@download/ENCFF391WGD.bam"
+control_actB1_path <- bfcrpath(bfc, control_actB1_url)
+
+peaks_actB1_url <- "https://www.encodeproject.org/files/ENCFF915WBP/@@download/ENCFF915WBP.bed.gz"
+peaks_actB1_path <- bfcrpath(bfc, peaks_actB1_url)
+
+actB1_enhancers <- run_rose(treatment = actB1_path, control = control_actB1_path, peaks = peaks_actB1_path)
+```
+
+Now we can merge the activated and naive B cell super enhancers.
+
+```{r}
+naiveB1_SEs <- naiveB1_enhancers[naiveB1_enhancers$super]
+actB1_SEs <- actB1_enhancers[actB1_enhancers$super]
+all_SEs <- rbind(naiveB1_SEs, actB1_SEs)
+
+# Merge overlapping SEs between the groups
+all_SEs <- reduce(all_SEs)
+
+# Add a REGION_ID column to keep track of which bins came from which SEs for differential analysis.
+mcols(all_SEs)$REGION_ID <- seq_along(all_SEs)
+```
+
+
+### Loading Additional Replicates
+
+Now we need signal counts for additional replicates in each group.
+Note that we could call SEs from each sample individually before merging, or use more complicated strategies to derive SEs to compare, e.g. overlap in some proportion of samples.
+
+```{r}
+naiveB2_url <- "https://www.encodeproject.org/files/ENCFF808SRS/@@download/ENCFF808SRS.bam"
+naiveB2_path <- bfcrpath(bfc, naiveB2_url)
+
+actB2_url <- "https://www.encodeproject.org/files/ENCFF267CCT/@@download/ENCFF267CCT.bam"
+actB2_path <- bfcrpath(bfc, actB2_url)
+```
+
+### Differential Analysis
+
+Now we can actually do our differential analysis.
+This will compose of:
+
+- Splitting each SE into 100 bp bins.
+- Counting the signal in each bin for each replicate.
+- Dropping very low signal bins.
+- Run DESeq2 with pretty standard paramaeters.
+- Apply LFC shrinkage.
+- Merge significant bins that are within 300 bp of each other.
+
+```{r}
+library(DESeq2)
+library(apeglm)
+
+# Break into bins
+se_gr_binned <- unlist(tile(all_SEs, width=100))
+mcols(se_gr_binned) <- rep(mcols(all_SEs)["REGION_ID"], elementNROWS(tile(all_SEs, width=100)))
+
+# Count reads in each bin.
+se_gr_binned_counts <- regionCounts(bam.files = c(naiveB1_path, naiveB2_path, treat_path, actB2_path), 
+                                    regions = se_gr_binned, 
+                                    ext = 200, 
+                                    param = readParam(minq = 20))
+
+se_gr_binned_counts$group <- c(rep("naive_Bcell", 2), rep("activated_Bcell", 2))
+
+# Drop very low count bins
+smallestGroupSize <- 2
+keep <- rowSums(counts(dds) >= 20) >= smallestGroupSize
+dds <- dds[keep,]
+
+dds <- DESeq(dds)
+rezzy <- results(dds, contrast = c("group", "naive_Bcell", "activated_Bcell"), alpha = 0.05, lfcThreshold = log2(1.25))
+res <- lfcShrink(dds, res = rezzy, coef = c("group_naive_Bcell_vs_activated_Bcell"), type = "apeglm", format = "GRanges", saveCols = "REGION_ID")
+```
+
+### Rank SEs by Number of Significant Bins Altered
+
+To get an idea of which SEs may be affected.
+
+```{r}
+sig <- res[res$padj < 0.05 & !is.na(res$padj),]
+
+# Get table of bins altered in each REGION_ID, ranked by count
+db.ses <- as.data.frame(sig) %>% group_by(REGION_ID) %>% summarise(n = n()) %>% arrange(desc(n))
+
+# To se_gr, add columns for number of sig bins based on matching REGION_ID
+# Get db SE IDs
+db.ids <- se_gr$REGION_ID %in% db.ses$REGION_ID
+
+se_gr$NUM_ALTERED_BINS <- 0
+se_gr$NUM_ALTERED_BINS[db.ids] <- db.ses$n[match(se_gr$REGION_ID[db.ids], db.ses$REGION_ID)]
+```
+
+### Merge Adjacent/Nearby Bins for Highlighting
+
+This will get us a more interpretable set of regions to investigate.
+
+```{r}
+merged_sig <- mergeWindows(sig, tol = 300, max.width = 5000)
+
+merged_regions <- merged_sig$regions
+
+# Limit to those that are at least 3 bins wide
+merged_regions <- merged_regions[width(merged_regions) >= 300]
+
+# For testing, limit to those on chr6
+merged_regions <- merged_regions[seqnames(merged_regions) == "chr2"]
+```
+
+### Visualization
+
+Now we can do the usual viz, e.g. MA plots and tracks.
+Depending on the groups being compared, you might expect larger shifts in the MA plot than you'd expect from a typical gene-level analysis.
+SEs are relatively cell-type specific and somewhat dynamic, plus we'll be looking at the individual bins composing them.
+
+A typical MA plot is of limited utility here, but we can still generate one.
+
+```{r}
+plotMA(rezzy, alpha = 0.05)
+```
+
+### Gviz Viz
+
+This is a more complex example of how you might visualize the results of the differential analysis using Gviz.
+
+```{r}
+# Get region for SE with most DB bins
+top.db <- db.ses$REGION_ID[66]
+se.info <- se_gr[se_gr$REGION_ID == top.db,]
+
+# Genome track
+gtrack <- GenomeAxisTrack()
+itrack <- IdeogramTrack(genome = "hg38")
+
+# Annotation track
+greg <- GeneRegionTrack(TxDb.Hsapiens.UCSC.hg38.knownGene, showId=TRUE,
+    geneSymbol=TRUE, name="", background.title="transparent")
+symbols <- unlist(mapIds(org.Hs.eg.db, gene(greg), "SYMBOL",
+    "ENTREZID", multiVals = "first"))
+symbol(greg) <- symbols[gene(greg)]
+
+# SE track
+setrack <- AnnotationTrack(se_gr, genome = "hg38", name = "SEs")
+
+# SE bin data
+sigfctrack <- DataTrack(range = sig, data = -sig$log2FoldChange, name = "sig_bins_FCs", genome = "hg38", 
+                         ylim = c(-max(abs(sig$log2FoldChange)), max(abs(sig$log2FoldChange))), type = "b", 
+                     col = "orange", background.title = "orange", baseline = 0)
+
+# SE bin foldchanges
+fctrack <- DataTrack(range = res, data = -res$log2FoldChange, name = "bin_FCs", genome = "hg38", 
+                         ylim = c(-max(abs(res$log2FoldChange)), max(abs(res$log2FoldChange))), 
+                     type = "b", col = "black", background.title = "black", baseline = 0)
+
+
+# Signal Tracks
+bw_na1 <- "./example_data/bigWigs/ENCFF993DJI.naive_Bcell.H3K27ac.rep1.bigWig"
+bw_na2 <- "./example_data/bigWigs/ENCFF808SRS.naive_Bcell.H3K27ac.rep2.bigWig"
+bw_act1 <- "./example_data/bigWigs/ENCFF640GBC.activated_Bcell.H3K27ac.rep1.bigWig"
+bw_act2 <- "./example_data/bigWigs/ENCFF267CCT.activated_Bcell.H3K27ac.rep2.bigWig"
+
+naive1_track <- DataTrack(range = bw_na1, type = "l", name = "naiveB_r1", genome = "hg38", 
+                        col = "blue", background.title = "blue", ylim = c(0, 12), baseline = 0)
+naive2_track <- DataTrack(range = bw_na2, type = "l", name = "naiveB_r2", genome = "hg38", 
+                        col = "blue", background.title = "blue", ylim = c(0, 12), baseline = 0)
+act1_track <- DataTrack(range = bw_act1, type = "l", name = "activatedB_r1", genome = "hg38", 
+                        col = "red", background.title = "red", ylim = c(0, 12), baseline = 0)
+act2_track <- DataTrack(range = bw_act2, type = "l", name = "activatedB_r2", genome = "hg38", 
+                        col = "red", background.title = "red", ylim = c(0, 12), baseline = 0)
+
+# Highlight sig bins
+ht <- HighlightTrack(trackList = list(act1_track, act2_track, fctrack, sigfctrack, naive1_track, naive2_track),
+                     start = start(merged_regions), end = end(merged_regions), chromosome = as.character(seqnames(se.info)),
+                     fill = "#d3ff8c", col = "#8ff7df")
+
+plotTracks(list(gtrack, itrack, greg, setrack, ht), from = start(se.info), to = end(se.info), chromosome = as.character(seqnames(se.info)), transcriptAnnotation = "symbol", collapseTranscripts = "longest")
+```
 
 ## SessionInfo
 
