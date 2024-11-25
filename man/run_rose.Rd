@@ -143,7 +143,5 @@ result <- run_rose(sample.bam, peaks)
 }
 }
 \author{
-Jared Andrews
-
-Nicolas Peterson
+Jared Andrews, Nicolas Peterson
 }
