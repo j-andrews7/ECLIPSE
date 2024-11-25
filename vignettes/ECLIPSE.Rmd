@@ -44,22 +44,45 @@ devtools::install_github("stjude-biohackathon/ECLIPSE")
 
 ## Usage
 
-Given a BAM file and a BED file of peaks, ROSE can be run with the `run_rose` function.
+Given paths to a BAM file and a BED file of peaks, ROSE can be run with the `run_rose` function.
 Optionally, a control BAM file for input or IgG from the same sample can be provided.
 
-Alternatively, `bamFile` objects and a `GRanges` object for the peaks can be provided.
+Alternatively, `bamFile` objects for the treatment and control signal and a `GRanges` object for the peaks can be provided.
 
 The output is a `GRanges` object containing all putative enhancers with their super enhancer designation in the `super` metadata column.
 
-```{r, eval = FALSE}
-sample_bam <- "/path/to/bam.bam"
-control_bam <- "/path/to/control.bam"
-peaks <- "/path/to/peaks.bed"
+Below is an example of running ROSE on a BAM file of H3K27ac MINT ChIP-seq, an [input control](https://www.encodeproject.org/experiments/ENCSR056PPJ/) BAM file, and a BED file of peaks from [this ENCODE experiment of human naive B cells](https://www.encodeproject.org/experiments/ENCSR660EVU/).
 
-putative_enhancers <- run_rose(sample.bam = sample_bam, control.bam = control_bam, peaks = peaks)
+```{r, eval = FALSE}
+# We'll use the BiocFileCache package to download and cache the files, which will take a few minutes the first time they're used.
+library(BiocFileCache)
+bcf <- BiocFileCache(ask = FALSE)
+treat_url <- "https://www.encodeproject.org/files/ENCFF993DJI/@@download/ENCFF993DJI.bam"
+treat_path <- bfcrpath(bfc, treat_url)
+
+control_url <- "https://www.encodeproject.org/files/ENCFF821MAI/@@download/ENCFF821MAI.bam"
+control_path <- bfcrpath(bfc, control_url)
+
+peaks_url <- "https://www.encodeproject.org/files/ENCFF590DFY/@@download/ENCFF590DFY.bed.gz"
+peaks_path <- bfcrpath(bfc, peaks_url)
+
+putative_enhancers <- run_rose(treatment = treat_path, control = control_path, peaks = peaks_path)
 
 putative_enhancers
 ```
+
+### Other Input Types
+
+Though the example above uses BAM files, `run_rose` can also accept BigWig or bedGraph signal files, though doing so alters the coverage calculation. See `?run_rose` for more information.
+
+### Visualization
+
+Can't be a super enhancer package without the classic swoosh plot.
+
+```{r}
+plot_enhancer_curve(putative_enhancers, factor_label = "H3K27ac")
+```
+
 
 ## Comparison to Original ROSE Implementation
 
@@ -85,6 +108,65 @@ plot_enhancer_curve(ENCSR660EVU_putative_enhancers)
 Notably, the number of super-enhancers identified are not a perfect match due to very slight differences in the coverage calculations.
 However, all super-enhancers identified in the original implementation are also called by ECLIPSE.
 Determination of the root cause of the minor discrepancy is ongoing.
+
+## Running with TSS Exclusion
+
+ROSE is frequently ran with TSS exclusion to remove peaks fully contained within a window (usually +/- 2.5kb) around each TSS.
+
+What is less well documented in the original ROSE implementation is that this also invokes an unstitching process of regions that span TSSes (+/- 50 bp) from 3 or more unique genes, whereby a stitched region is then split back into its original constituent elements. 
+
+The original implementation provides no way to alter or disable this behavior, but ECLIPSE does.
+
+```{r}
+library(TxDb.Hsapiens.UCSC.hg38.knownGene)
+#txdb <- TxDb.Hsapiens.UCSC.hg38.knownGene
+
+# With TSS exclusion and unstitching, a la the original ROSE implementation
+res_tss_exl <- run_rose(treatment = treat_path, 
+                        control = control_path, 
+                        peaks = peaks_path,
+                        txdb = txdb,
+                        tss.exclusion.distance = 2500,
+                        max.unique.gene.tss.overlap = 2)
+
+# With TSS exclusion but no unstitching
+res_tss_exl_no_unstitch <- run_rose(treatment = treat_path, 
+                                    control = control_path, 
+                                    peaks = peaks_path,
+                                    txdb = txdb,
+                                    tss.exclusion.distance = 2500,
+                                    max.unique.gene.tss.overlap = NULL)
+```
+
+We can then see how these differ in the number of SEs identified.
+
+With TSS exclusion and unstitching, as is commonly done with the original implementation for H3K27ac data:
+
+```{r}
+plot_enhancer_curve(res_tss_exl, factor_label = "H3K27ac")
+```
+
+With TSS exclusion but no unstitching:
+
+```{r}
+plot_enhancer_curve(res_tss_exl_no_unstitch, factor_label = "H3K27ac")
+```
+
+These settings have dramatic impacts on the final number of regions returned and the number (and size) of SEs identified.
+
+```{r}
+message("Number of regions returned with TSS exclusion and unstitching: ", length(res_tss_exl))
+message("Number of regions returned with TSS exclusion and no unstitching: ", length(res_tss_exl))
+
+message("Number of SEs identified with TSS exclusion and unstitching: ", length(res_tss_exl[res_tss_exl$super]))
+message("Number of SEs identified with TSS exclusion and no unstitching: ", length(res_tss_exl_no_unstitch[res_tss_exl_no_unstitch$super]))
+
+message("Average width of SEs with TSS exclusion and unstitching: ", mean(width(res_tss_exl[res_tss_exl$super])))
+message("Average width of SEs with TSS exclusion and no unstitching: ", mean(width(res_tss_exl_no_unstitch[res_tss_exl_no_unstitch$super])))
+```
+
+
+Given the lack of documentation or discussion on this behavior in the original implementation or papers, it is unclear how this should be handled in practice.
 
 
 

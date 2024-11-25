@@ -32,12 +32,15 @@ Imports:
     rtracklayer,
     S4Vectors,
     stats,
-    KneeArrower
+    KneeArrower,
+    GenomeInfoDb
 Suggests:
     BiocStyle,
     knitr,
     testthat (>= 3.0.0),
-    rmarkdown
+    rmarkdown,
+    BiocFileCache,
+    TxDb.Hsapiens.UCSC.hg38.knownGene
 Depends:
     R (>= 4.4.0)
 biocViews: 

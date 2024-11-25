@@ -13,7 +13,8 @@ run_rose(
   txdb = NULL,
   org.db = NULL,
   drop.y = TRUE,
-  max.unique.gene.tss.overlap = 2,
+  max.unique.gene.tss.overlap = NULL,
+  tss.overlap.distance = 50,
   negative.to.zero = TRUE,
   thresh.method = "ROSE",
   transformation = NULL,
@@ -56,7 +57,10 @@ Default is \code{TRUE}.}
 
 \item{max.unique.gene.tss.overlap}{Maximum number of unique genes that a region can overlap the TSS of before being unstitched.
 Note that multiple overlapping regions from the same gene, e.g. multiple isoforms, are counted as one.
-Default is 2. Ignored if \code{txdb} is \code{NULL}.}
+Default is \code{NULL}. Ignored if \code{txdb} is \code{NULL}.}
+
+\item{tss.overlap.distance}{Numeric value for the distance (in bp) to add to TSS for unstitching.
+Default is 50. Ignored if \code{txdb} is \code{NULL}.}
 
 \item{negative.to.zero}{Logical indicating whether to set negative ranking signals to zero.
 Default is \code{TRUE}.}

@@ -466,7 +466,9 @@ classify_enhancers <- function(regions,
 #'   Default is `TRUE`.
 #' @param max.unique.gene.tss.overlap Maximum number of unique genes that a region can overlap the TSS of before being unstitched.
 #'   Note that multiple overlapping regions from the same gene, e.g. multiple isoforms, are counted as one.
-#'   Default is 2. Ignored if `txdb` is `NULL`.
+#'   Default is `NULL`. Ignored if `txdb` is `NULL`.
+#' @param tss.overlap.distance Numeric value for the distance (in bp) to add to TSS for unstitching.
+#'   Default is 50. Ignored if `txdb` is `NULL`.
 #' @param negative.to.zero Logical indicating whether to set negative ranking signals to zero.
 #'   Default is `TRUE`.
 #' @param thresh.method Character string specifying the method to determine the signal threshold.
@@ -503,8 +505,7 @@ classify_enhancers <- function(regions,
 #'
 #' @return A `GRanges` object containing the classified super-enhancers and associated metadata.
 #'
-#' @author Jared Andrews
-#' @author Nicolas Peterson
+#' @author Jared Andrews, Nicolas Peterson
 #'
 #' @importFrom Rsamtools BamFile indexBam
 #' @importFrom genomation readBed
@@ -529,7 +530,8 @@ run_rose <- function(
     txdb = NULL,
     org.db = NULL,
     drop.y = TRUE,
-    max.unique.gene.tss.overlap = 2,
+    max.unique.gene.tss.overlap = NULL,
+    tss.overlap.distance = 50,
     negative.to.zero = TRUE,
     thresh.method = "ROSE",
     transformation = NULL,
@@ -548,10 +550,10 @@ run_rose <- function(
     if (is.character(treatment)) {
         treatment <- BamFile(treatment)
     }
-    message(paste0("Sample BAM file: ", sub(".*/(.*\\.bam)$", "\\1", treatment$path)))
+    message(paste0("Treatment BAM file: ", sub(".*/(.*\\.bam)$", "\\1", treatment$path)))
 
     if (length(treatment$index) == 0 || !file.exists(treatment$index)) {
-        message("Sample BAM index not found. Generating an index.")
+        message("Treatment BAM index not found. Generating an index.")
         treatment$index <- unname(indexBam(treatment))
     }
 
@@ -574,6 +576,10 @@ run_rose <- function(
     }
 
     if (tss.exclusion.distance > 0) {
+        if (is.null(txdb)) {
+            stop("txdb must be provided if tss.exclusion.distance is greater than 0")
+        }
+
         message("Excluding peaks within TSS exclusion distance of ", tss.exclusion.distance)
         tss <- promoters(txdb, upstream = tss.exclusion.distance, downstream = tss.exclusion.distance, columns = "GENEID")
 
@@ -582,7 +588,7 @@ run_rose <- function(
 
         contained_indices <- queryHits(overlaps)
 
-        message(length(contained_indices), " peaks fully contained within TSS exclusion distance and will be excluded from stitching")
+        message(length(contained_indices), " peaks fully contained within TSS exclusion window and will be excluded from stitching")
         peaks <- peaks[-unique(contained_indices)]
     }
 
@@ -596,7 +602,12 @@ run_rose <- function(
         peaks_stitched <- peaks_stitched[peaks.chr != "chrY"]
     }
 
-    if (tss.exclusion.distance > 0 && max.unique.gene.tss.overlap > 0) {
+    if (!is.null(max.unique.gene.tss.overlap)) {
+        if (is.null(txdb)) {
+            stop("txdb must be provided if max.unique.gene.tss.overlap is not NULL")
+        }
+
+        tss <- promoters(txdb, upstream = tss.overlap.distance, downstream = tss.overlap.distance, columns = "GENEID")
         message("Unstitching regions overlapping TSS from more than ", max.unique.gene.tss.overlap, " unique genes")
         unstitched <- unstitch_regions(peaks_stitched, peaks, tss, threshold = max.unique.gene.tss.overlap)
         peaks_stitched <- unstitched$regions
