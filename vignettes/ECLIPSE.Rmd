@@ -148,7 +148,7 @@ These settings have dramatic impacts on the final number of regions returned and
 
 ```{r}
 message("Number of regions returned with TSS exclusion and unstitching: ", length(res_tss_exl))
-message("Number of regions returned with TSS exclusion and no unstitching: ", length(res_tss_exl))
+message("Number of regions returned with TSS exclusion and no unstitching: ", length(res_tss_exl_no_unstitch))
 
 message("Number of SEs identified with TSS exclusion and unstitching: ", length(res_tss_exl[res_tss_exl$super]))
 message("Number of SEs identified with TSS exclusion and no unstitching: ", length(res_tss_exl_no_unstitch[res_tss_exl_no_unstitch$super]))

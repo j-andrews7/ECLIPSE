@@ -4,9 +4,9 @@
 #' based on strand orientation.
 #'
 #' @param regions A `GRanges` object containing genomic regions.
-#' @param upstream Number of bases to extend upstream. 
+#' @param upstream Number of bases to extend upstream.
 #'   Default is 0.
-#' @param downstream Number of bases to extend downstream. 
+#' @param downstream Number of bases to extend downstream.
 #'   Default is 0.
 #'
 #' @return A `GRanges` object with extended regions.
@@ -499,7 +499,7 @@ classify_enhancers <- function(regions,
 #' @param identify.active.genes Logical indicating whether active genes should be identified based on
 #'   overlaps with `peaks`. Cannot be used simultaneously with `active.genes`.
 #'   Default is `FALSE`.
-#' @param omit.unkown Logical indicating whether uncharacterized genes (i.e., gene symbols starting with *LOC*)
+#' @param omit.unknown Logical indicating whether uncharacterized genes (i.e., gene symbols starting with *LOC*)
 #'   should be excluded from annotations.
 #'   Default is `TRUE`.
 #'
@@ -545,7 +545,7 @@ run_rose <- function(
     promoter.dist = c(2000, 200),
     active.genes = NULL,
     identify.active.genes = FALSE,
-    omit.unkown = TRUE) {
+    omit.unknown = TRUE) {
 
     if (is.character(treatment)) {
         treatment <- BamFile(treatment)
@@ -631,7 +631,7 @@ run_rose <- function(
         message("Annotating regions")
         regions <- annotate_enhancers(regions, peaks, tx.db = txdb, org.db = org.db, annotate.dist = annotate.dist,
                                       promoter.dist = promoter.dist, active.genes = active.genes,
-                                      identify.active.genes = identify.active.genes, omit.unknown = omit.unkown)
+                                      identify.active.genes = identify.active.genes, omit.unknown = omit.unknown)
     }
 
     regions

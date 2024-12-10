@@ -28,7 +28,7 @@ run_rose(
   promoter.dist = c(2000, 200),
   active.genes = NULL,
   identify.active.genes = FALSE,
-  omit.unkown = TRUE
+  omit.unknown = TRUE
 )
 }
 \arguments{
@@ -105,7 +105,7 @@ Default is \code{NULL}.}
 overlaps with \code{peaks}. Cannot be used simultaneously with \code{active.genes}.
 Default is \code{FALSE}.}
 
-\item{omit.unkown}{Logical indicating whether uncharacterized genes (i.e., gene symbols starting with \emph{LOC})
+\item{omit.unknown}{Logical indicating whether uncharacterized genes (i.e., gene symbols starting with \emph{LOC})
 should be excluded from annotations.
 Default is \code{TRUE}.}
 }
