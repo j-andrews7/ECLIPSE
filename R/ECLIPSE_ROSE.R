@@ -627,11 +627,15 @@ run_rose <- function(
         thresh.method = thresh.method, first.threshold = first.threshold, arbitrary.threshold = arbitrary.threshold
     )
 
-    if(annotate) {
-        message("Annotating regions")
-        regions <- annotate_enhancers(regions, peaks, tx.db = txdb, org.db = org.db, annotate.dist = annotate.dist,
-                                      promoter.dist = promoter.dist, active.genes = active.genes,
-                                      identify.active.genes = identify.active.genes, omit.unknown = omit.unknown)
+    if (annotate) {
+        if (!is.null(txdb) & !is.null(org.db)) {
+            message("Annotating regions")
+            regions <- annotate_enhancers(regions, peaks, tx.db = txdb, org.db = org.db, annotate.dist = annotate.dist,
+                                        promoter.dist = promoter.dist, active.genes = active.genes,
+                                        identify.active.genes = identify.active.genes, omit.unknown = omit.unknown)
+        } else {
+            message("txdb and org.db must be provided for annotation, skipping")
+        }
     }
 
     regions
