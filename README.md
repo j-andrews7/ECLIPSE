@@ -32,7 +32,7 @@ library(devtools)
 devtools::install_github("stjude-biohackathon/ECLIPSE")
 ```
 
-## Usage
+## Quick Start
 
 Given paths to a BAM file and a BED file of peaks, ROSE can be run with the `run_rose` function.
 Optionally, a control BAM file for input or IgG from the same sample can be provided.
@@ -43,10 +43,20 @@ The output is a `GRanges` object containing all putative enhancers with their su
 
 Below is an example of running ROSE on a BAM file of H3K27ac MINT ChIP-seq, an [input control](https://www.encodeproject.org/experiments/ENCSR056PPJ/) BAM file, and a BED file of peaks from [this ENCODE experiment of human naive B cells](https://www.encodeproject.org/experiments/ENCSR660EVU/).
 
+See `?run_rose` for more details.
+
 ```r
 # We'll use the BiocFileCache package to download and cache the files, which will take a few minutes the first time they're used.
 library(BiocFileCache)
-bcf <- BiocFileCache(ask = FALSE)
+
+# For annotation
+library(TxDb.Hsapiens.UCSC.hg38.knownGene)
+library(org.Hs.eg.db)
+
+txdb <- TxDb.Hsapiens.UCSC.hg38.knownGene
+org.db <- org.Hs.eg.db
+
+bfc <- BiocFileCache(ask = FALSE)
 treat_url <- "https://www.encodeproject.org/files/ENCFF993DJI/@@download/ENCFF993DJI.bam"
 treat_path <- bfcrpath(bfc, treat_url)
 
@@ -56,7 +66,9 @@ control_path <- bfcrpath(bfc, control_url)
 peaks_url <- "https://www.encodeproject.org/files/ENCFF590DFY/@@download/ENCFF590DFY.bed.gz"
 peaks_path <- bfcrpath(bfc, peaks_url)
 
-naiveB1_enhancers <- run_rose(treatment = treat_path, control = control_path, peaks = peaks_path)
+naiveB1_enhancers <- run_rose(treatment = treat_path, control = control_path, peaks = peaks_path,
+                              txdb = txdb, org.db = org.db, stitch.distance = 12500, tss.exclusion.distance = 2500,
+                              max.unique.gene.tss.overlap = 2)
 
 naiveB1_enhancers
 ```
