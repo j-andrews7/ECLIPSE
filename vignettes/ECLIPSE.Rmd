@@ -39,7 +39,7 @@ It also contains visualization functions to generate high-quality plots of speci
 if (!requireNamespace("devtools", quietly = TRUE))
     install.packages("devtools")
 
-devtools::install_github("stjude-biohackathon/ECLIPSE")
+devtools::install_github("j-andrews7/ECLIPSE")
 ```
 
 ## Usage
@@ -54,6 +54,7 @@ The output is a `GRanges` object containing all putative enhancers with their su
 Below is an example of running ROSE on a BAM file of H3K27ac MINT ChIP-seq, an [input control](https://www.encodeproject.org/experiments/ENCSR056PPJ/) BAM file, and a BED file of peaks from [this ENCODE experiment of human naive B cells](https://www.encodeproject.org/experiments/ENCSR660EVU/).
 
 ```{r, eval = FALSE}
+library(ECLIPSE)
 # We'll use the BiocFileCache package to download and cache the files, which will take a few minutes the first time they're used.
 library(BiocFileCache)
 
@@ -77,7 +78,11 @@ control_path <- bfcrpath(bfc, control_url)
 peaks_url <- "https://www.encodeproject.org/files/ENCFF590DFY/@@download/ENCFF590DFY.bed.gz"
 peaks_path <- bfcrpath(bfc, peaks_url)
 
-naiveB1_enhancers <- run_rose(treatment = treat_path, control = control_path, peaks = peaks_path,
+treat_bam <- BamFile(treat_path)
+control_bam <- BamFile(control_path)
+peaks <- readBed(peaks_path)
+
+naiveB1_enhancers <- run_rose(treatment = treat_bam, control = control_bam, peaks = peaks,
                               txdb = txdb, org.db = org.db, stitch.distance = 12500, tss.exclusion.distance = 2500,
                               max.unique.gene.tss.overlap = 2)
 
@@ -99,7 +104,7 @@ plot_enhancer_curve(naiveB1_enhancers, factor_label = "H3K27ac")
 
 ## Comparison to Original ROSE Implementation
 
-With default parameters, `run_rose` is an attempt to match the results from the original ROSE implementation as closely as possible.
+With default parameters, `run_rose` is an attempt to closely match the results from the original ROSE implementation.
 
 For comparison's sake, here is the enhancer ranking curve from the original ROSE implementation for [H3K27ac Mint-ChIP-seq from
 naive B cells](https://www.encodeproject.org/experiments/ENCSR660EVU/) as provided by ENCODE:
@@ -113,6 +118,28 @@ These results are using no TSS exclusion to compare the underlying classificatio
 Notably, the number of super-enhancers identified are not a perfect match due to very slight differences in the coverage calculations.
 However, all super-enhancers identified in the original implementation are also called by ECLIPSE.
 Determination of the root cause of the minor discrepancy is ongoing.
+
+### Known Methodological Differences between ECLIPSE and ROSE
+
+ - ROSE performs read extension after pulling all reads that overlap a region, whereas ECLIPSE extends all reads and then pulls those that overlap. This is much faster, but likely results in very minor coverage calculation differences.
+ 
+## Important Observations of ROSE
+
+We have closely examined and tested the ROSE source code and have made the following observations:
+
+ 1. ROSE does not use region size scaling for final signal ranking in a meaningful way. The signals in ROSE are derived as follows:
+   - All reads overlapping a given region are pulled.
+   - These reads are extended by 200 bp.
+   - The coverage for each base in the region is counted (via samtools view, which is very slow when done on each individual region).
+   - The coverage for the region is summed and divided by the region width to generate a density factor.
+   - The density factor is then divided by the MMR factor (mapped reads/1000000) to generate a library size-normalized signal factor.
+   - This factor is saved for each stitched region into the "mapped GFF" files.
+   - The "signal" is then calculated from the "mapped GFF" files for the stitched regions by multiplying the library size-normalized factor by the width of the region. Ultimately, this just results in the library size-normalized sum of coverage for a region, independent of its size (ADD EXAMPLE TO DEMONSTRATE THIS.)
+     - This biases ROSE towards large regions, potentially ignoring smaller regions that have a higher signal density that may still have an outsized regulatory impact.
+   - ECLIPSE provides an option (`normalize.by.width`) to scale the final signal by the region width. 
+     In the future, we will add ways to include only the width of reasonable signal regions (either by using the sum of constituent elements widths or bases with some reasonable level of signal) in this calculation.
+ 2. ROSE has a bug in the unstitching process whereby it rarely does not unstitch regions that clearly span TSSes from 3 or more unique genes.
+   What exactly the bug is remains unclear, but it may be related to how ROSE is performing overlaps.
 
 ## Running with TSS Exclusion
 
@@ -174,15 +201,24 @@ Given the lack of documentation or discussion on this behavior in the original i
 
 At times, it may be more convenient to use BigWig files for signal input. 
 
-ECLIPSE handles these slightly different than BAM files, for which it uses the total number of reads as an additional normalization step, as that's what ROSE does (even though it doesn't really make any sense and you get largely similar results without it given how per-region coverage is calculated).
+ECLIPSE handles these slightly different than BAM files, for which it uses the total number of reads as an additional normalization step, as that's what ROSE does.
 
-Given this is new functionality, we can do whatever we want, which is to just calculate coverage for the regions divided by the width of the region. This is simple and fast. In these cases, the assumption is that the input or IgG control signal has already been incorporated (or subtracted or whatever) as appropriate and thus will not be provided.
+In some cases, the input or IgG control signal has already been incorporated (subtracted out, used to calculate a BigWig of foldchanges, etc) as appropriate and thus will not be provided. 
+
+This is one such case, as this BigWig file is the foldchange of H3K27ac signal in naive B cells over input.
+
+As such, it makes sense to set `floor = 0` for the "signal" calculation as much of the artifact noise should have been removed.
 
 ```{r}
 library(rtracklayer)
 
+naiveB1_bw <- rtracklayer::import(treat_bw_path)
 
+naiveB1_enhancers_bigwig <- run_rose(treatment = naiveB1_bw, peaks = peaks,
+                              txdb = txdb, org.db = org.db, stitch.distance = 12500, tss.exclusion.distance = 2500,
+                              max.unique.gene.tss.overlap = 2, floor = 0, normalize.by.width = TRUE)
 ```
+
 
 
 ## Differential Sub-Structural Analysis
