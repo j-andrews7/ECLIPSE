@@ -147,113 +147,176 @@ unstitch_regions <- function(stitched, original, tss, id.col = "GENEID", thresho
 }
 
 
-#' Get region signal from BAM files and add to GRanges
+#' Get region signal from BAM files or GRanges for specific regions
 #'
-#' Calculates the libary size-normalized coverage of reads within specified regions from a
-#' signal BAM file with optional subtraction of a control BAM file.
-#' Allows read extension and additional processing like setting negative coverage to zero.
+#' Calculates the width-normalized (and library size-normalized if `BamFiles` are used) coverage of reads or signal for specified regions.
+#' Allows read extension if `BamFile` objects are used as input.
 #'
 #' @details The defaults of this function are set to so as to match the functionality
 #' of ROSE as closely as possible.
 #'
-#' To detail the process:
+#' To detail the process for a provided `BamFile` object:
 #' - The total number of reads in the signal BAM file is calculated.
-#' - The signal reads are extended downstream by a specified number of bases (200 bp by default).
+#' - If specified, the signal reads are extended downstream by a specified number of bases (200 bp by default).
 #' - The coverage for each basepair in the regions of interest are calculated.
 #'     ROSE does this manually by calling samtools for each region, which is slow.
 #' - Basepairs with coverage below a specified threshold (`floor`, 1 by default) are removed.
 #' - For each region, the coverage is summed and divided by the total number of reads to get the signal.
+#' 
+#'  To detail the process for a provided `GRanges` object:
+#' - The weighted coverage for each basepair in the regions of interest are calculated using the `score` value.
+#' - Basepairs with coverage below a specified threshold (`floor`, 1 by default) are removed.
+#' - For each region, the coverage is summed and divided by the total number of reads to get the signal.
 #'
-#' @param sample.bam Character or BamFile object representing the signal BAM file.
-#' @param regions Character or GRanges object representing genomic regions of interest.
-#' @param control.bam Character or BamFile object representing the control BAM file.
+#' @param treatment `BamFile` or `GRanges` object representing the sample signal.
+#' @param regions `GRanges` object representing genomic regions of interest.
+#' @param control `BamFile` or `GRanges` object representing the control (usually input or IgG) signal.
 #'   Default is `NULL`.
 #' @param floor Numeric value for the minimum coverage threshold to count for region.
 #'   Coverage must be greater than this value to be counted in the signal.
 #'   Default is 1.
 #' @param read.ext Numeric value for extending reads downstream. Default is 200.
+#' @param normalize.by.width Logical indicating whether to normalize signal by region width.
+#'   `FALSE` by default, as ROSE does this, but then it undoes it in a later step, so what's the point?
 #'
 #' @return A GRanges object for `regions` with additional columns for sample and control (if provided) signal.
-#'   The metadata of the object will also contain the scaling factor for library size normalization for the `sample.bam`
-#'   and `control.bam` (if provided) in the `sample_mmr` and `control_mmr` elements.
+#'   The metadata of the object will also contain the scaling factor for library size normalization for the `treatment`
+#'   and `control` (if provided) in the `sample_mmr` and `control_mmr` elements.
 #'
 #' @export
 #'
-#' @importFrom Rsamtools BamFile idxstatsBam
+#' @importFrom Rsamtools BamFile idxstatsBam indexBam
 #' @importFrom rtracklayer import
-#' @importFrom GenomicRanges granges trim
+#' @importFrom S4Vectors 'metadata<-'
+#' @importFrom GenomicRanges granges trim coverage
 #' @importFrom HelloRanges do_bedtools_coverage
 #' @importFrom IRanges IRanges
-#' @importFrom genomation readBed
 #'
 #' @author Jared Andrews
 #'
 #' @examples
 #' library(GenomicRanges)
 #' \dontrun{
-#' sample.bam <- "path/to/sample.bam"
+#' treatment <- "path/to/sample.bam"
 #' regions <- GRanges(seqnames = "chr1", ranges = IRanges(1000, 2000))
 #' regions <- add_region_signal(sample.bam, regions, floor = 10)
 #' }
-add_region_signal <- function(sample.bam,
+add_region_signal <- function(treatment,
                               regions,
-                              control.bam = NULL,
+                              control = NULL,
                               floor = 1,
-                              read.ext = 200) {
-    if (is.character(sample.bam)) {
-        sample.bam <- BamFile(sample.bam)
+                              read.ext = 200,
+                              normalize.by.width = FALSE) {
+    # Check that treatment is a BamFile or GRanges object
+    if (!is(treatment, "BamFile") && !is(treatment, "GRanges")) {
+        stop("treatment must be a BamFile or GRanges object")
     }
 
-    if (is.character(control.bam)) {
-        control.bam <- BamFile(control.bam)
+    # Check that control is a BamFile or GRanges object
+    if (!is.null(control) && !is(control, "BamFile") && !is(control, "GRanges")) {
+        stop("control must be a BamFile or GRanges object")
     }
 
-    if (is.character(regions)) {
-        regions <- readBed(file = regions)
+    # Check that regions is a GRanges object
+    if (!is(regions, "GRanges")) {
+        stop("regions must be a GRanges object")
     }
 
-    samp_stat <- idxstatsBam(sample.bam)
-    samp_total <- sum(samp_stat$mapped)
-    samp_mmr <- samp_total / 1000000
-
-    samp_reads <- granges(import(sample.bam))
-    samp_reads <- trim(samp_reads)
-
-    if (read.ext > 0) {
-        samp_reads <- extend_reads(samp_reads, downstream = read.ext)
+    if (is(treatment, "BamFile")) {
+        if (length(treatment$index) == 0 || !file.exists(treatment$index)) {
+            message("Treatment BAM index not found. Generating an index.")
+            treatment$index <- unname(indexBam(treatment))
+        }
     }
 
-    samp_cov <- do_bedtools_coverage(a = regions, b = samp_reads, d = TRUE)
+    if (!is.null(control)) {
+        if (is(control, "BamFile")) {
+            if (length(control$index) == 0 || !file.exists(control$index)) {
+                message("Control BAM index not found. Generating an index.")
+                control$index <- unname(indexBam(control))
+            }
+        }
+    }
 
-    samp_cov$coverage <- samp_cov$coverage[samp_cov$coverage > floor]
-    samp_cov$coverage <- sum(samp_cov$coverage)
+    if (is(treatment, "BamFile")) {
+        samp_stat <- idxstatsBam(treatment)
+        samp_total <- sum(samp_stat$mapped)
+        samp_mmr <- samp_total / 1000000
 
-    samp_cov$signal <- samp_cov$coverage / samp_mmr
+        samp_reads <- granges(import(treatment))
+        samp_reads <- trim(samp_reads)
 
-    regions$sample_signal <- samp_cov$signal
-    metadata(regions)$sample_mmr <- samp_mmr
-
-    ctrl_sig <- NULL
-    if (!is.null(control.bam)) {
-        ctrl_stat <- idxstatsBam(control.bam)
-        ctrl_total <- sum(ctrl_stat$mapped)
-        ctrl_mmr <- ctrl_total / 1000000
-
-        ctrl_reads <- granges(import(control.bam))
-        ctrl_reads <- trim(ctrl_reads)
         if (read.ext > 0) {
-            ctrl_reads <- extend_reads(ctrl_reads, downstream = read.ext)
+            samp_reads <- extend_reads(samp_reads, downstream = read.ext)
         }
 
-        ctrl_cov <- do_bedtools_coverage(a = regions, b = ctrl_reads, d = TRUE)
+        # samp_cov <- do_bedtools_coverage(a = regions, b = samp_reads, d = TRUE)
 
-        ctrl_cov$coverage <- ctrl_cov$coverage[ctrl_cov$coverage > floor]
-        ctrl_cov$coverage <- sum(ctrl_cov$coverage)
+        cov <- unname(coverage(samp_reads)[regions])
+        samp_cov <- regions
+        mcols(samp_cov)$coverage <- cov
 
-        ctrl_cov$signal <- ctrl_cov$coverage / ctrl_mmr
+        samp_cov$coverage <- samp_cov$coverage[samp_cov$coverage > floor]
+        samp_cov$coverage <- sum(samp_cov$coverage)
 
-        regions$control_signal <- ctrl_cov$signal
-        metadata(regions)$control_mmr <- ctrl_mmr
+        samp_cov$signal <- samp_cov$coverage / samp_mmr
+
+        if (normalize.by.width) {
+            samp_cov$signal <- samp_cov$signal / width(samp_cov)
+        }
+
+        regions$sample_signal <- samp_cov$signal
+        metadata(regions)$sample_mmr <- samp_mmr
+    } else {
+        # Weight coverage by the score, which is presumably indicative of the signal in some way.
+        cov <- unname(coverage(treatment, weight = "score")[regions])
+        samp_cov <- regions
+        mcols(samp_cov)$coverage <- cov
+        samp_cov$coverage <- samp_cov$coverage[samp_cov$coverage > floor]
+        samp_cov$signal <- sum(samp_cov$coverage)
+
+        if (normalize.by.width) {
+            samp_cov$signal <- samp_cov$signal / width(samp_cov)
+        }
+
+        regions$sample_signal <- samp_cov$signal
+    }
+
+    if (!is.null(control)) {
+        if (is(control, "BamFile")) {
+            ctrl_stat <- idxstatsBam(control)
+            ctrl_total <- sum(ctrl_stat$mapped)
+            ctrl_mmr <- ctrl_total / 1000000
+
+            ctrl_reads <- granges(import(control))
+            ctrl_reads <- trim(ctrl_reads)
+            if (read.ext > 0) {
+                ctrl_reads <- extend_reads(ctrl_reads, downstream = read.ext)
+            }
+
+            ctrl_cov <- do_bedtools_coverage(a = regions, b = ctrl_reads, d = TRUE)
+
+            ctrl_cov$coverage <- ctrl_cov$coverage[ctrl_cov$coverage > floor]
+            ctrl_cov$coverage <- sum(ctrl_cov$coverage)
+
+            ctrl_cov$signal <- ctrl_cov$coverage / ctrl_mmr
+
+            regions$control_signal <- ctrl_cov$signal
+            metadata(regions)$control_mmr <- ctrl_mmr
+        } else {
+            # Weight coverage by the score, which is presumably indicative of the signal in some way.
+            cov <- unname(coverage(treatment, weight = "score")[regions])
+            ctrl_cov <- regions
+            mcols(ctrl_cov)$coverage <- cov
+            ctrl_cov$coverage <- ctrl_cov$coverage[ctrl_cov$coverage > floor]
+            ctrl_cov$signal <- sum(ctrl_cov$coverage)
+
+            if (normalize.by.width) {
+                ctrl_cov$signal <- ctrl_cov$signal / width(ctrl_cov)
+            }
+
+            regions$control_signal <- ctrl_cov$signal
+        }
     }
 
     regions
@@ -265,17 +328,19 @@ add_region_signal <- function(sample.bam,
 #' Computes the ranking signal for the given genomic regions by
 #' optionally subtracting control signal and setting negative values to zero.
 #'
-#' @param regions A GRanges object containing the `sample_signal` and optionally `control_signal` in metadata columns.
+#' @param regions A `GRanges` object containing the `sample_signal` and optionally `control_signal` in metadata columns.
 #' @param negative.to.zero Logical indicating whether to set negative values in the ranking signal to zero.
 #'   Default is `TRUE`, as that is what ROSE does.
 #'
-#' @return A GRanges object with an added `rank_signal` column containing the
+#' @return A `GRanges` object with an added `rank_signal` column containing the
 #'   computed `rank_signal` column in its metadata columns, sorted by said column.
-#'   Adds a `region_rank` column as well. Adds a `control_subtracted` element to the `metadata`.
+#'   Adds a `region_rank` column as well.
+#'   Adds a `control_subtracted` element to the `metadata`.
 #'
 #' @export
 #'
 #' @importFrom GenomicRanges sort
+#' @importFrom S4Vectors 'metadata<-'
 #'
 #' @author Jared Andrews, Jacqueline Myers
 #'
@@ -318,7 +383,7 @@ add_signal_rank <- function(regions, negative.to.zero = TRUE) {
 #' Optionally applies user-transformations to the signal before classification, which is highly recommended
 #' to ameliorate the effects of outliers on the classification.
 #'
-#' @param regions A GRanges object containing `rank_signal` and optionally other metadata.
+#' @param regions A `GRanges` object containing `rank_signal` and optionally other metadata.
 #' @param transformation A function to apply to the ranking signal before threshold determination.
 #'   Default is `NULL`.
 #' @param drop.zeros Logical indicating whether to drop regions with zero signal.
@@ -332,10 +397,10 @@ add_signal_rank <- function(regions, negative.to.zero = TRUE) {
 #' @param arbitrary.threshold Numeric value for the arbitrary threshold if the "arbitrary" method is selected.
 #'   Default is 0.4, which is a reasonable setting when a cumulative proportion of signal transformation is applied.
 #'
-#' @return A GRanges object with a new `super` logical column indicating whether the enhancer is classified as a super enhancer.
+#' @return A `GRanges` object with a new `super` logical column indicating whether the enhancer is classified as a super enhancer.
 #'   A `rankby_signal` column is added as the final signal values used for ranking (post-transformation, if applied).
 #'   Any transformations applied, the thresholding method used, the threshold, and the number of dropped regions if
-#'   `drop.zeros = TRUE` are added to the metadata of the GRanges object.
+#'   `drop.zeros = TRUE` are added to the metadata of the `GRanges` object.
 #'
 #' @export
 #'
@@ -449,9 +514,9 @@ classify_enhancers <- function(regions,
 #' - The "arbitrary" method allows for the user to specify a fixed threshold, useful for transformations
 #'   that result in a consistent curve shape with a known maximum, like cumulative proportion of signal.
 #'
-#' @param treatment A character string or `BamFile` object representing the sample BAM file.
-#' @param peaks A character string or `GRanges` object representing the peaks.
-#' @param control A character string or `BamFile` object representing the control BAM file.
+#' @param treatment A `BamFile` or `GRanges` object representing the sample signal.
+#' @param peaks A  `GRanges` object representing the peaks.
+#' @param control A `BamFile` or `GRanges` object representing the control (usually input or IgG) signal.
 #'   Default is `NULL`.
 #' @param stitch.distance Numeric value for the distance within which peaks are stitched together.
 #'   Default is 12500.
@@ -480,6 +545,8 @@ classify_enhancers <- function(regions,
 #'  Default is 1.
 #' @param read.ext Numeric value for extending reads downstream.
 #'   Default is 200. Ignored if inputs are `GRanges` objects.
+#' @param normalize.by.width Logical indicating whether to normalize signal by region width.
+#'   ROSE does this, but then undoes it at a later step, so `FALSE` is the default.
 #' @param drop.zeros Logical indicating whether to drop regions with zero signal.
 #'   Default is `FALSE`.
 #' @param first.threshold Numeric value for the fraction of steepest slope when using the "first" threshold method.
@@ -507,7 +574,7 @@ classify_enhancers <- function(regions,
 #'
 #' @author Jared Andrews, Nicolas Peterson
 #'
-#' @importFrom Rsamtools BamFile indexBam
+#' @importFrom Rsamtools indexBam
 #' @importFrom genomation readBed
 #' @importFrom GenomicRanges reduce seqnames trim
 #' @importFrom S4Vectors queryHits
@@ -537,6 +604,7 @@ run_rose <- function(
     transformation = NULL,
     floor = 1,
     read.ext = 200,
+    normalize.by.width = FALSE,
     drop.zeros = FALSE,
     first.threshold = 0.5,
     arbitrary.threshold = 0.4,
@@ -547,33 +615,38 @@ run_rose <- function(
     identify.active.genes = FALSE,
     omit.unknown = TRUE) {
 
-    if (is.character(treatment)) {
-        treatment <- BamFile(treatment)
+    # Check that treatment is a BamFile or GRanges object
+    if (!is(treatment, "BamFile") && !is(treatment, "GRanges")) {
+        stop("treatment must be a BamFile or GRanges object")
     }
-    message(paste0("Treatment BAM file: ", sub(".*/(.*\\.bam)$", "\\1", treatment$path)))
 
-    if (length(treatment$index) == 0 || !file.exists(treatment$index)) {
-        message("Treatment BAM index not found. Generating an index.")
-        treatment$index <- unname(indexBam(treatment))
+    # Check that control is a BamFile or GRanges object
+    if (!is.null(control) && !is(control, "BamFile") && !is(control, "GRanges")) {
+        stop("control must be a BamFile or GRanges object")
+    }
+
+    # Check that peaks is a GRanges object
+    if (!is(peaks, "GRanges")) {
+        stop("peaks must be a GRanges object")
+    }
+
+    if (is(treatment, "BamFile")) {
+        if (length(treatment$index) == 0 || !file.exists(treatment$index)) {
+            message("Treatment BAM index not found. Generating an index.")
+            treatment$index <- unname(indexBam(treatment))
+        }
     }
 
     if (!is.null(control)) {
-        if (is.character(control)) {
-            control <- BamFile(control)
-        }
-        message(paste0("Control BAM file: ", sub(".*/(.*\\.bam)$", "\\1", control$path)))
-
-        if (length(control$index) == 0 || !file.exists(control$index)) {
-            message("Control BAM index not found. Generating an index.")
-            control$index <- unname(indexBam(control))
+        if (is(control, "BamFile")) {
+            if (length(control$index) == 0 || !file.exists(control$index)) {
+                message("Control BAM index not found. Generating an index.")
+                control$index <- unname(indexBam(control))
+            }
         }
     }
 
-    message("Reading peaks")
-    if (is.character(peaks)) {
-        peaks <- readBed(peaks)
-        peaks <- trim(peaks)
-    }
+    message(length(peaks), " peaks provided")
 
     if (tss.exclusion.distance > 0) {
         if (is.null(txdb)) {
@@ -588,7 +661,7 @@ run_rose <- function(
 
         contained_indices <- queryHits(overlaps)
 
-        message(length(contained_indices), " peaks fully contained within TSS exclusion window and will be excluded from stitching")
+        message(length(unique(contained_indices)), " peaks fully contained within TSS exclusion window and will be excluded from stitching")
         peaks <- peaks[-unique(contained_indices)]
     }
 
@@ -616,7 +689,7 @@ run_rose <- function(
     }
 
     message("Calculating normalized signal for ", length(peaks_stitched)," stitched regions")
-    regions <- add_region_signal(treatment, peaks_stitched, control.bam = control, floor = floor, read.ext = read.ext)
+    regions <- add_region_signal(treatment, peaks_stitched, control = control, floor = floor, read.ext = read.ext, normalize.by.width = normalize.by.width)
 
     message("Ranking regions")
     regions <- add_signal_rank(regions, negative.to.zero = negative.to.zero)

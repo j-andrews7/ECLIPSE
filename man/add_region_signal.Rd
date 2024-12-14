@@ -2,22 +2,23 @@
 % Please edit documentation in R/ECLIPSE_ROSE.R
 \name{add_region_signal}
 \alias{add_region_signal}
-\title{Get region signal from BAM files and add to GRanges}
+\title{Get region signal from BAM files or GRanges for specific regions}
 \usage{
 add_region_signal(
-  sample.bam,
+  treatment,
   regions,
-  control.bam = NULL,
+  control = NULL,
   floor = 1,
-  read.ext = 200
+  read.ext = 200,
+  normalize.by.width = FALSE
 )
 }
 \arguments{
-\item{sample.bam}{Character or BamFile object representing the signal BAM file.}
+\item{treatment}{\code{BamFile} or \code{GRanges} object representing the sample signal.}
 
-\item{regions}{Character or GRanges object representing genomic regions of interest.}
+\item{regions}{\code{GRanges} object representing genomic regions of interest.}
 
-\item{control.bam}{Character or BamFile object representing the control BAM file.
+\item{control}{\code{BamFile} or \code{GRanges} object representing the control (usually input or IgG) signal.
 Default is \code{NULL}.}
 
 \item{floor}{Numeric value for the minimum coverage threshold to count for region.
@@ -25,27 +26,36 @@ Coverage must be greater than this value to be counted in the signal.
 Default is 1.}
 
 \item{read.ext}{Numeric value for extending reads downstream. Default is 200.}
+
+\item{normalize.by.width}{Logical indicating whether to normalize signal by region width.
+\code{FALSE} by default, as ROSE does this, but then it undoes it in a later step, so what's the point?}
 }
 \value{
 A GRanges object for \code{regions} with additional columns for sample and control (if provided) signal.
-The metadata of the object will also contain the scaling factor for library size normalization for the \code{sample.bam}
-and \code{control.bam} (if provided) in the \code{sample_mmr} and \code{control_mmr} elements.
+The metadata of the object will also contain the scaling factor for library size normalization for the \code{treatment}
+and \code{control} (if provided) in the \code{sample_mmr} and \code{control_mmr} elements.
 }
 \description{
-Calculates the libary size-normalized coverage of reads within specified regions from a
-signal BAM file with optional subtraction of a control BAM file.
-Allows read extension and additional processing like setting negative coverage to zero.
+Calculates the width-normalized (and library size-normalized if \code{BamFiles} are used) coverage of reads or signal for specified regions.
+Allows read extension if \code{BamFile} objects are used as input.
 }
 \details{
 The defaults of this function are set to so as to match the functionality
 of ROSE as closely as possible.
 
-To detail the process:
+To detail the process for a provided \code{BamFile} object:
 \itemize{
 \item The total number of reads in the signal BAM file is calculated.
-\item The signal reads are extended downstream by a specified number of bases (200 bp by default).
+\item If specified, the signal reads are extended downstream by a specified number of bases (200 bp by default).
 \item The coverage for each basepair in the regions of interest are calculated.
 ROSE does this manually by calling samtools for each region, which is slow.
+\item Basepairs with coverage below a specified threshold (\code{floor}, 1 by default) are removed.
+\item For each region, the coverage is summed and divided by the total number of reads to get the signal.
+}
+
+To detail the process for a provided \code{GRanges} object:
+\itemize{
+\item The weighted coverage for each basepair in the regions of interest are calculated using the \code{score} value.
 \item Basepairs with coverage below a specified threshold (\code{floor}, 1 by default) are removed.
 \item For each region, the coverage is summed and divided by the total number of reads to get the signal.
 }
@@ -53,7 +63,7 @@ ROSE does this manually by calling samtools for each region, which is slow.
 \examples{
 library(GenomicRanges)
 \dontrun{
-sample.bam <- "path/to/sample.bam"
+treatment <- "path/to/sample.bam"
 regions <- GRanges(seqnames = "chr1", ranges = IRanges(1000, 2000))
 regions <- add_region_signal(sample.bam, regions, floor = 10)
 }
