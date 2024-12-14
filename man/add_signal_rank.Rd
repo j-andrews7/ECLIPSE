@@ -7,15 +7,16 @@
 add_signal_rank(regions, negative.to.zero = TRUE)
 }
 \arguments{
-\item{regions}{A GRanges object containing the \code{sample_signal} and optionally \code{control_signal} in metadata columns.}
+\item{regions}{A \code{GRanges} object containing the \code{sample_signal} and optionally \code{control_signal} in metadata columns.}
 
 \item{negative.to.zero}{Logical indicating whether to set negative values in the ranking signal to zero.
 Default is \code{TRUE}, as that is what ROSE does.}
 }
 \value{
-A GRanges object with an added \code{rank_signal} column containing the
+A \code{GRanges} object with an added \code{rank_signal} column containing the
 computed \code{rank_signal} column in its metadata columns, sorted by said column.
-Adds a \code{region_rank} column as well. Adds a \code{control_subtracted} element to the \code{metadata}.
+Adds a \code{region_rank} column as well.
+Adds a \code{control_subtracted} element to the \code{metadata}.
 }
 \description{
 Computes the ranking signal for the given genomic regions by

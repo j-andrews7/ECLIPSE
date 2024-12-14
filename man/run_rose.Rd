@@ -20,6 +20,7 @@ run_rose(
   transformation = NULL,
   floor = 1,
   read.ext = 200,
+  normalize.by.width = FALSE,
   drop.zeros = FALSE,
   first.threshold = 0.5,
   arbitrary.threshold = 0.4,
@@ -32,11 +33,11 @@ run_rose(
 )
 }
 \arguments{
-\item{treatment}{A character string or \code{BamFile} object representing the sample BAM file.}
+\item{treatment}{A \code{BamFile} or \code{GRanges} object representing the sample signal.}
 
-\item{peaks}{A character string or \code{GRanges} object representing the peaks.}
+\item{peaks}{A  \code{GRanges} object representing the peaks.}
 
-\item{control}{A character string or \code{BamFile} object representing the control BAM file.
+\item{control}{A \code{BamFile} or \code{GRanges} object representing the control (usually input or IgG) signal.
 Default is \code{NULL}.}
 
 \item{stitch.distance}{Numeric value for the distance within which peaks are stitched together.
@@ -77,6 +78,9 @@ Default is 1.}
 
 \item{read.ext}{Numeric value for extending reads downstream.
 Default is 200. Ignored if inputs are \code{GRanges} objects.}
+
+\item{normalize.by.width}{Logical indicating whether to normalize signal by region width.
+ROSE does this, but then undoes it at a later step, so \code{FALSE} is the default.}
 
 \item{drop.zeros}{Logical indicating whether to drop regions with zero signal.
 Default is \code{FALSE}.}

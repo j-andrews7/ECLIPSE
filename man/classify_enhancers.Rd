@@ -14,7 +14,7 @@ classify_enhancers(
 )
 }
 \arguments{
-\item{regions}{A GRanges object containing \code{rank_signal} and optionally other metadata.}
+\item{regions}{A \code{GRanges} object containing \code{rank_signal} and optionally other metadata.}
 
 \item{transformation}{A function to apply to the ranking signal before threshold determination.
 Default is \code{NULL}.}
@@ -34,10 +34,10 @@ Default is 0.5.}
 Default is 0.4, which is a reasonable setting when a cumulative proportion of signal transformation is applied.}
 }
 \value{
-A GRanges object with a new \code{super} logical column indicating whether the enhancer is classified as a super enhancer.
+A \code{GRanges} object with a new \code{super} logical column indicating whether the enhancer is classified as a super enhancer.
 A \code{rankby_signal} column is added as the final signal values used for ranking (post-transformation, if applied).
 Any transformations applied, the thresholding method used, the threshold, and the number of dropped regions if
-\code{drop.zeros = TRUE} are added to the metadata of the GRanges object.
+\code{drop.zeros = TRUE} are added to the metadata of the \code{GRanges} object.
 }
 \description{
 Classifies enhancers as super enhancers or typical enhancers based on a ranking signal and
