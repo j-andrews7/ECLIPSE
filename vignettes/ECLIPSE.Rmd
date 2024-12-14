@@ -68,6 +68,9 @@ bfc <- BiocFileCache(ask = FALSE)
 treat_url <- "https://www.encodeproject.org/files/ENCFF993DJI/@@download/ENCFF993DJI.bam"
 treat_path <- bfcrpath(bfc, treat_url)
 
+treat_bw_url <- "https://www.encodeproject.org/files/ENCFF901BFR/@@download/ENCFF901BFR.bigWig"
+treat_bw_path <- bfcrpath(bfc, treat_bw_url)
+
 control_url <- "https://www.encodeproject.org/files/ENCFF821MAI/@@download/ENCFF821MAI.bam"
 control_path <- bfcrpath(bfc, control_url)
 
@@ -120,9 +123,6 @@ What is less well documented in the original ROSE implementation is that this al
 The original implementation provides no way to alter or disable this behavior, but ECLIPSE does.
 
 ```{r}
-library(TxDb.Hsapiens.UCSC.hg38.knownGene)
-#txdb <- TxDb.Hsapiens.UCSC.hg38.knownGene
-
 # With TSS exclusion and unstitching, a la the original ROSE implementation
 res_tss_exl <- run_rose(treatment = treat_path, 
                         control = control_path, 
@@ -169,6 +169,21 @@ message("Average width of SEs with TSS exclusion and no unstitching: ", mean(wid
 
 
 Given the lack of documentation or discussion on this behavior in the original implementation or papers, it is unclear how this should be handled in practice.
+
+## Using BigWig Inputs
+
+At times, it may be more convenient to use BigWig files for signal input. 
+
+ECLIPSE handles these slightly different than BAM files, for which it uses the total number of reads as an additional normalization step, as that's what ROSE does (even though it doesn't really make any sense and you get largely similar results without it given how per-region coverage is calculated).
+
+Given this is new functionality, we can do whatever we want, which is to just calculate coverage for the regions divided by the width of the region. This is simple and fast. In these cases, the assumption is that the input or IgG control signal has already been incorporated (or subtracted or whatever) as appropriate and thus will not be provided.
+
+```{r}
+library(rtracklayer)
+
+
+```
+
 
 ## Differential Sub-Structural Analysis
 
