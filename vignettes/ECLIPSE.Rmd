@@ -135,7 +135,7 @@ We have closely examined and tested the ROSE source code and have made the follo
    - The density factor is then divided by the MMR factor (mapped reads/1000000) to generate a library size-normalized signal factor.
    - This factor is saved for each stitched region into the "mapped GFF" files.
    - The "signal" is then calculated from the "mapped GFF" files for the stitched regions by multiplying the library size-normalized factor by the width of the region. Ultimately, this just results in the library size-normalized sum of coverage for a region, independent of its size (ADD EXAMPLE TO DEMONSTRATE THIS.)
-     - This biases ROSE towards large regions, potentially ignoring smaller regions that have a higher signal density that may still have an outsized regulatory impact.
+     - This biases ROSE towards large regions, potentially ignoring smaller regions that have a higher signal density that may still have an outsized regulatory impact. This is worth exploring further.
    - ECLIPSE provides an option (`normalize.by.width`) to scale the final signal by the region width. 
      In the future, we will add ways to include only the width of reasonable signal regions (either by using the sum of constituent elements widths or bases with some reasonable level of signal) in this calculation.
  2. ROSE has a bug in the unstitching process whereby it rarely does not unstitch regions that clearly span TSSes from 3 or more unique genes.
@@ -197,11 +197,13 @@ message("Average width of SEs with TSS exclusion and no unstitching: ", mean(wid
 
 Given the lack of documentation or discussion on this behavior in the original implementation or papers, it is unclear how this should be handled in practice.
 
-## Using BigWig Inputs
+## Using BigWig or bedGraph Inputs
 
-At times, it may be more convenient to use BigWig files for signal input. 
+At times, it may be more convenient to use BigWig or bedGraph files for signal input. 
+These can be imported as GRanges objects and passed as inputs to `run_rose`.
 
 ECLIPSE handles these slightly different than BAM files, for which it uses the total number of reads as an additional normalization step, as that's what ROSE does.
+ECLIPSE presumes that the signal is already normalized for library size and does not perform this step.
 
 In some cases, the input or IgG control signal has already been incorporated (subtracted out, used to calculate a BigWig of foldchanges, etc) as appropriate and thus will not be provided. 
 
