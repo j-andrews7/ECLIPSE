@@ -331,6 +331,8 @@ add_region_signal <- function(treatment,
 #' @param regions A `GRanges` object containing the `sample_signal` and optionally `control_signal` in metadata columns.
 #' @param negative.to.zero Logical indicating whether to set negative values in the ranking signal to zero.
 #'   Default is `TRUE`, as that is what ROSE does.
+#' @param drop.negative Logical indicating whether to remove regions with negative values in the ranking signal.
+#'   Default is `FALSE`.
 #'
 #' @return A `GRanges` object with an added `rank_signal` column containing the
 #'   computed `rank_signal` column in its metadata columns, sorted by said column.
@@ -352,7 +354,7 @@ add_region_signal <- function(treatment,
 #' regions$sample_signal <- rnorm(length(regions))
 #' regions$control_signal <- rnorm(length(regions))
 #' ranked_regions <- add_signal_rank(regions)
-add_signal_rank <- function(regions, negative.to.zero = TRUE) {
+add_signal_rank <- function(regions, negative.to.zero = TRUE, drop.negative = FALSE) {
     if (is.null(regions$sample_signal)) {
         stop("regions must contain signal, run 'get_region_signal'")
     }
@@ -367,6 +369,13 @@ add_signal_rank <- function(regions, negative.to.zero = TRUE) {
 
     if (negative.to.zero) {
         rank_sig[rank_sig < 0] <- 0
+    }
+
+    if (drop.negative) {
+        num_dropped_regions <- sum(rank_sig < 0)
+        message(paste("Dropped", num_dropped_regions, "regions due to negative signal"))
+        regions <- regions[rank_sig >= 0]
+        rank_sig <- rank_sig[rank_sig >= 0]
     }
 
     regions$rank_signal <- rank_sig
@@ -536,6 +545,8 @@ classify_enhancers <- function(regions,
 #'   Default is 50. Ignored if `txdb` is `NULL`.
 #' @param negative.to.zero Logical indicating whether to set negative ranking signals to zero.
 #'   Default is `TRUE`.
+#' @param drop.negative Logical indicating whether to remove regions with negative values in the ranking signal.
+#'   Default is `FALSE`.
 #' @param thresh.method Character string specifying the method to determine the signal threshold.
 #'   Must be one of "ROSE", "first", "curvature", or "arbitrary".
 #'   Default is "ROSE".
@@ -600,6 +611,7 @@ run_rose <- function(
     max.unique.gene.tss.overlap = NULL,
     tss.overlap.distance = 50,
     negative.to.zero = TRUE,
+    drop.negative = FALSE,
     thresh.method = "ROSE",
     transformation = NULL,
     floor = 1,
@@ -692,7 +704,7 @@ run_rose <- function(
     regions <- add_region_signal(treatment, peaks_stitched, control = control, floor = floor, read.ext = read.ext, normalize.by.width = normalize.by.width)
 
     message("Ranking regions")
-    regions <- add_signal_rank(regions, negative.to.zero = negative.to.zero)
+    regions <- add_signal_rank(regions, negative.to.zero = negative.to.zero, drop.negative = drop.negative)
 
     message("Classifying enhancers")
     regions <- classify_enhancers(regions,
