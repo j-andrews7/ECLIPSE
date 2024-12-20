@@ -4,13 +4,16 @@
 \alias{add_signal_rank}
 \title{Get ranking signal for regions and add to GRanges object}
 \usage{
-add_signal_rank(regions, negative.to.zero = TRUE)
+add_signal_rank(regions, negative.to.zero = TRUE, drop.no.signal = FALSE)
 }
 \arguments{
 \item{regions}{A \code{GRanges} object containing the \code{sample_signal} and optionally \code{control_signal} in metadata columns.}
 
 \item{negative.to.zero}{Logical indicating whether to set negative values in the ranking signal to zero.
 Default is \code{TRUE}, as that is what ROSE does.}
+
+\item{drop.no.signal}{Logical indicating whether to remove regions with negative or zero values in the ranking signal.
+Default is \code{FALSE}.}
 }
 \value{
 A \code{GRanges} object with an added \code{rank_signal} column containing the

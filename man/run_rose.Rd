@@ -16,6 +16,7 @@ run_rose(
   max.unique.gene.tss.overlap = NULL,
   tss.overlap.distance = 50,
   negative.to.zero = TRUE,
+  drop.no.signal = FALSE,
   thresh.method = "ROSE",
   transformation = NULL,
   floor = 1,
@@ -65,6 +66,9 @@ Default is 50. Ignored if \code{txdb} is \code{NULL}.}
 
 \item{negative.to.zero}{Logical indicating whether to set negative ranking signals to zero.
 Default is \code{TRUE}.}
+
+\item{drop.no.signal}{Logical indicating whether to remove regions with negative or zero values in the ranking signal.
+Default is \code{FALSE}.}
 
 \item{thresh.method}{Character string specifying the method to determine the signal threshold.
 Must be one of "ROSE", "first", "curvature", or "arbitrary".
