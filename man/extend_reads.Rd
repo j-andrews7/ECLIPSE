@@ -7,22 +7,26 @@
 extend_reads(regions, upstream = 0, downstream = 0)
 }
 \arguments{
-\item{regions}{A GRanges object containing genomic regions.}
+\item{regions}{A \code{GRanges} object containing genomic regions.}
 
-\item{upstream}{Number of bases to extend upstream. Default is 0.}
+\item{upstream}{Number of bases to extend upstream.
+Default is 0.}
 
-\item{downstream}{Number of bases to extend downstream. Default is 0.}
+\item{downstream}{Number of bases to extend downstream.
+Default is 0.}
 }
 \value{
-A GRanges object with extended regions.
+A \code{GRanges} object with extended regions.
 }
 \description{
 Extends reads by a specified number of bases upstream or downstream
 based on strand orientation.
 }
 \examples{
+library(GenomicRanges)
 regions <- GRanges(seqnames = "chr1", ranges = IRanges(100, 200), strand = "+")
 extended <- extend_reads(regions, upstream = 50, downstream = 100)
+extended
 }
 \author{
 Jared Andrews

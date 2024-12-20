@@ -39,31 +39,72 @@ It also contains visualization functions to generate high-quality plots of speci
 if (!requireNamespace("devtools", quietly = TRUE))
     install.packages("devtools")
 
-devtools::install_github("stjude-biohackathon/ECLIPSE")
+devtools::install_github("j-andrews7/ECLIPSE")
 ```
 
 ## Usage
 
-Given a BAM file and a BED file of peaks, ROSE can be run with the `run_rose` function.
+Given paths to a BAM file and a BED file of peaks, ROSE can be run with the `run_rose` function.
 Optionally, a control BAM file for input or IgG from the same sample can be provided.
 
-Alternatively, `bamFile` objects and a `GRanges` object for the peaks can be provided.
+Alternatively, `bamFile` objects for the treatment and control signal and a `GRanges` object for the peaks can be provided.
 
 The output is a `GRanges` object containing all putative enhancers with their super enhancer designation in the `super` metadata column.
 
+Below is an example of running ROSE on a BAM file of H3K27ac MINT ChIP-seq, an [input control](https://www.encodeproject.org/experiments/ENCSR056PPJ/) BAM file, and a BED file of peaks from [this ENCODE experiment of human naive B cells](https://www.encodeproject.org/experiments/ENCSR660EVU/).
+
 ```{r, eval = FALSE}
-sample_bam <- "/path/to/bam.bam"
-control_bam <- "/path/to/control.bam"
-peaks <- "/path/to/peaks.bed"
+library(ECLIPSE)
+# We'll use the BiocFileCache package to download and cache the files, which will take a few minutes the first time they're used.
+library(BiocFileCache)
 
-putative_enhancers <- run_rose(sample.bam = sample_bam, control.bam = control_bam, peaks = peaks)
+# For annotation
+library(TxDb.Hsapiens.UCSC.hg38.knownGene)
+library(org.Hs.eg.db)
 
-putative_enhancers
+txdb <- TxDb.Hsapiens.UCSC.hg38.knownGene
+org.db <- org.Hs.eg.db
+
+bfc <- BiocFileCache(ask = FALSE)
+treat_url <- "https://www.encodeproject.org/files/ENCFF993DJI/@@download/ENCFF993DJI.bam"
+treat_path <- bfcrpath(bfc, treat_url)
+
+treat_bw_url <- "https://www.encodeproject.org/files/ENCFF901BFR/@@download/ENCFF901BFR.bigWig"
+treat_bw_path <- bfcrpath(bfc, treat_bw_url)
+
+control_url <- "https://www.encodeproject.org/files/ENCFF821MAI/@@download/ENCFF821MAI.bam"
+control_path <- bfcrpath(bfc, control_url)
+
+peaks_url <- "https://www.encodeproject.org/files/ENCFF590DFY/@@download/ENCFF590DFY.bed.gz"
+peaks_path <- bfcrpath(bfc, peaks_url)
+
+treat_bam <- BamFile(treat_path)
+control_bam <- BamFile(control_path)
+peaks <- readBed(peaks_path)
+
+naiveB1_enhancers <- run_rose(treatment = treat_bam, control = control_bam, peaks = peaks,
+                              txdb = txdb, org.db = org.db, stitch.distance = 12500, tss.exclusion.distance = 2500,
+                              max.unique.gene.tss.overlap = 2)
+
+naiveB1_enhancers
 ```
+
+### Other Input Types
+
+Though the example above uses BAM files, `run_rose` can also accept BigWig or bedGraph signal files, though doing so alters the coverage calculation. See `?run_rose` for more information.
+
+### Visualization
+
+Can't be a super enhancer package without the classic swoosh plot.
+
+```{r}
+plot_enhancer_curve(naiveB1_enhancers, factor_label = "H3K27ac")
+```
+
 
 ## Comparison to Original ROSE Implementation
 
-With default parameters, `run_rose` is an attempt to match the results from the original ROSE implementation as closely as possible.
+With default parameters, `run_rose` is an attempt to closely match the results from the original ROSE implementation.
 
 For comparison's sake, here is the enhancer ranking curve from the original ROSE implementation for [H3K27ac Mint-ChIP-seq from
 naive B cells](https://www.encodeproject.org/experiments/ENCSR660EVU/) as provided by ENCODE:
@@ -74,19 +115,307 @@ knitr::include_graphics("ENCFF590DFY_Plot_points.png")
 
 These results are using no TSS exclusion to compare the underlying classification approach as closely as possible.
 
-Here is the enhancer ranking curve returned from ECLIPSE after `run_rose` on the same data:
-
-```{r}
-library(ECLIPSE)
-data("ENCSR660EVU_putative_enhancers", package = "ECLIPSE")
-plot_enhancer_curve(ENCSR660EVU_putative_enhancers)
-```
-
 Notably, the number of super-enhancers identified are not a perfect match due to very slight differences in the coverage calculations.
 However, all super-enhancers identified in the original implementation are also called by ECLIPSE.
 Determination of the root cause of the minor discrepancy is ongoing.
 
+### Known Methodological Differences between ECLIPSE and ROSE
 
+ - ROSE performs read extension after pulling all reads that overlap a region, whereas ECLIPSE extends all reads and then pulls those that overlap. This is much faster, but likely results in very minor coverage calculation differences.
+ 
+## Important Observations of ROSE
+
+We have closely examined and tested the ROSE source code and have made the following observations:
+
+ 1. ROSE does not use region size scaling for final signal ranking in a meaningful way. The signals in ROSE are derived as follows:
+   - All reads overlapping a given region are pulled.
+   - These reads are extended by 200 bp.
+   - The coverage for each base in the region is counted (via samtools view, which is very slow when done on each individual region).
+   - The coverage for the region is summed and divided by the region width to generate a density factor.
+   - The density factor is then divided by the MMR factor (mapped reads/1000000) to generate a library size-normalized signal factor.
+   - This factor is saved for each stitched region into the "mapped GFF" files.
+   - The "signal" is then calculated from the "mapped GFF" files for the stitched regions by multiplying the library size-normalized factor by the width of the region. Ultimately, this just results in the library size-normalized sum of coverage for a region, independent of its size (ADD EXAMPLE TO DEMONSTRATE THIS.)
+     - This biases ROSE towards large regions, potentially ignoring smaller regions that have a higher signal density that may still have an outsized regulatory impact. This is worth exploring further.
+   - ECLIPSE provides an option (`normalize.by.width`) to scale the final signal by the region width. 
+     In the future, we will add ways to include only the width of reasonable signal regions (either by using the sum of constituent elements widths or bases with some reasonable level of signal) in this calculation.
+ 2. ROSE has a bug in the unstitching process whereby it rarely does not unstitch regions that clearly span TSSes from 3 or more unique genes.
+   What exactly the bug is remains unclear, but it may be related to how ROSE is performing overlaps.
+
+## Running with TSS Exclusion
+
+ROSE is frequently ran with TSS exclusion to remove peaks fully contained within a window (usually +/- 2.5kb) around each TSS.
+
+What is less well documented in the original ROSE implementation is that this also invokes an unstitching process of regions that span TSSes (+/- 50 bp) from 3 or more unique genes, whereby a stitched region is then split back into its original constituent elements. 
+
+The original implementation provides no way to alter or disable this behavior, but ECLIPSE does.
+
+```{r}
+# With TSS exclusion and unstitching, a la the original ROSE implementation
+res_tss_exl <- run_rose(treatment = treat_path, 
+                        control = control_path, 
+                        peaks = peaks_path,
+                        txdb = txdb,
+                        tss.exclusion.distance = 2500,
+                        max.unique.gene.tss.overlap = 2)
+
+# With TSS exclusion but no unstitching
+res_tss_exl_no_unstitch <- run_rose(treatment = treat_path, 
+                                    control = control_path, 
+                                    peaks = peaks_path,
+                                    txdb = txdb,
+                                    tss.exclusion.distance = 2500,
+                                    max.unique.gene.tss.overlap = NULL)
+```
+
+We can then see how these differ in the number of SEs identified.
+
+With TSS exclusion and unstitching, as is commonly done with the original implementation for H3K27ac data:
+
+```{r}
+plot_enhancer_curve(res_tss_exl, factor_label = "H3K27ac")
+```
+
+With TSS exclusion but no unstitching:
+
+```{r}
+plot_enhancer_curve(res_tss_exl_no_unstitch, factor_label = "H3K27ac")
+```
+
+These settings have dramatic impacts on the final number of regions returned and the number (and size) of SEs identified.
+
+```{r}
+message("Number of regions returned with TSS exclusion and unstitching: ", length(res_tss_exl))
+message("Number of regions returned with TSS exclusion and no unstitching: ", length(res_tss_exl_no_unstitch))
+
+message("Number of SEs identified with TSS exclusion and unstitching: ", length(res_tss_exl[res_tss_exl$super]))
+message("Number of SEs identified with TSS exclusion and no unstitching: ", length(res_tss_exl_no_unstitch[res_tss_exl_no_unstitch$super]))
+
+message("Average width of SEs with TSS exclusion and unstitching: ", mean(width(res_tss_exl[res_tss_exl$super])))
+message("Average width of SEs with TSS exclusion and no unstitching: ", mean(width(res_tss_exl_no_unstitch[res_tss_exl_no_unstitch$super])))
+```
+
+
+Given the lack of documentation or discussion on this behavior in the original implementation or papers, it is unclear how this should be handled in practice.
+
+## Using BigWig or bedGraph Inputs
+
+At times, it may be more convenient to use BigWig or bedGraph files for signal input. 
+These can be imported as GRanges objects and passed as inputs to `run_rose`.
+
+ECLIPSE handles these slightly different than BAM files, for which it uses the total number of reads as an additional normalization step, as that's what ROSE does.
+ECLIPSE presumes that the signal is already normalized for library size and does not perform this step.
+
+In some cases, the input or IgG control signal has already been incorporated (subtracted out, used to calculate a BigWig of foldchanges, etc) as appropriate and thus will not be provided. 
+
+This is one such case, as this BigWig file is the foldchange of H3K27ac signal in naive B cells over input.
+
+As such, it makes sense to set `floor = 0` for the "signal" calculation as much of the artifact noise should have been removed.
+
+```{r}
+library(rtracklayer)
+
+naiveB1_bw <- rtracklayer::import(treat_bw_path)
+
+naiveB1_enhancers_bigwig <- run_rose(treatment = naiveB1_bw, peaks = peaks,
+                              txdb = txdb, org.db = org.db, stitch.distance = 12500, tss.exclusion.distance = 2500,
+                              max.unique.gene.tss.overlap = 2, floor = 0, normalize.by.width = TRUE)
+```
+
+
+
+## Differential Sub-Structural Analysis
+
+ECLIPSE also provides functionality to identify sub-structural changes within super enhancer regions between groups via differential analysis of small bins.
+
+For this example, we'll compare naive B cells and activated B cells from ENCODE.
+These groups have enough similarities to demonstrate how this analysis looks for similar regions, but also enough changes in SE structure to be interesting.
+
+### Call Activated B Cell Super Enhancers
+
+We'll also want the SEs from activated B cells so that we have all the SE regions between the groups included for comparison.
+This is also useful for classification of SE structure changes between groups (see below).
+
+```{r}
+actB1_url <- "https://www.encodeproject.org/files/ENCFF640GBC/@@download/ENCFF640GBC.bam"
+actB1_path <- bfcrpath(bfc, actB1_url)
+
+control_actB1_url <- "https://www.encodeproject.org/files/ENCFF391WGD/@@download/ENCFF391WGD.bam"
+control_actB1_path <- bfcrpath(bfc, control_actB1_url)
+
+peaks_actB1_url <- "https://www.encodeproject.org/files/ENCFF915WBP/@@download/ENCFF915WBP.bed.gz"
+peaks_actB1_path <- bfcrpath(bfc, peaks_actB1_url)
+
+actB1_enhancers <- run_rose(treatment = actB1_path, control = control_actB1_path, peaks = peaks_actB1_path)
+```
+
+Now we can merge the activated and naive B cell super enhancers.
+
+```{r}
+naiveB1_SEs <- naiveB1_enhancers[naiveB1_enhancers$super]
+actB1_SEs <- actB1_enhancers[actB1_enhancers$super]
+all_SEs <- rbind(naiveB1_SEs, actB1_SEs)
+
+# Merge overlapping SEs between the groups
+all_SEs <- reduce(all_SEs)
+
+# Add a REGION_ID column to keep track of which bins came from which SEs for differential analysis.
+mcols(all_SEs)$REGION_ID <- seq_along(all_SEs)
+```
+
+
+### Loading Additional Replicates
+
+Now we need signal counts for additional replicates in each group.
+Note that we could call SEs from each sample individually before merging, or use more complicated strategies to derive SEs to compare, e.g. overlap in some proportion of samples.
+
+```{r}
+naiveB2_url <- "https://www.encodeproject.org/files/ENCFF808SRS/@@download/ENCFF808SRS.bam"
+naiveB2_path <- bfcrpath(bfc, naiveB2_url)
+
+actB2_url <- "https://www.encodeproject.org/files/ENCFF267CCT/@@download/ENCFF267CCT.bam"
+actB2_path <- bfcrpath(bfc, actB2_url)
+```
+
+### Differential Analysis
+
+Now we can actually do our differential analysis.
+This will compose of:
+
+- Splitting each SE into 100 bp bins.
+- Counting the signal in each bin for each replicate.
+- Dropping very low signal bins.
+- Run DESeq2 with pretty standard paramaeters.
+- Apply LFC shrinkage.
+- Merge significant bins that are within 300 bp of each other.
+
+```{r}
+library(DESeq2)
+library(apeglm)
+
+# Break into bins
+se_gr_binned <- unlist(tile(all_SEs, width=100))
+mcols(se_gr_binned) <- rep(mcols(all_SEs)["REGION_ID"], elementNROWS(tile(all_SEs, width=100)))
+
+# Count reads in each bin.
+se_gr_binned_counts <- regionCounts(bam.files = c(naiveB1_path, naiveB2_path, treat_path, actB2_path), 
+                                    regions = se_gr_binned, 
+                                    ext = 200, 
+                                    param = readParam(minq = 20))
+
+se_gr_binned_counts$group <- c(rep("naive_Bcell", 2), rep("activated_Bcell", 2))
+
+# Drop very low count bins
+smallestGroupSize <- 2
+keep <- rowSums(counts(dds) >= 20) >= smallestGroupSize
+dds <- dds[keep,]
+
+dds <- DESeq(dds)
+rezzy <- results(dds, contrast = c("group", "naive_Bcell", "activated_Bcell"), alpha = 0.05, lfcThreshold = log2(1.25))
+res <- lfcShrink(dds, res = rezzy, coef = c("group_naive_Bcell_vs_activated_Bcell"), type = "apeglm", format = "GRanges", saveCols = "REGION_ID")
+```
+
+### Rank SEs by Number of Significant Bins Altered
+
+To get an idea of which SEs may be affected.
+
+```{r}
+sig <- res[res$padj < 0.05 & !is.na(res$padj),]
+
+# Get table of bins altered in each REGION_ID, ranked by count
+db.ses <- as.data.frame(sig) %>% group_by(REGION_ID) %>% summarise(n = n()) %>% arrange(desc(n))
+
+# To se_gr, add columns for number of sig bins based on matching REGION_ID
+# Get db SE IDs
+db.ids <- se_gr$REGION_ID %in% db.ses$REGION_ID
+
+se_gr$NUM_ALTERED_BINS <- 0
+se_gr$NUM_ALTERED_BINS[db.ids] <- db.ses$n[match(se_gr$REGION_ID[db.ids], db.ses$REGION_ID)]
+```
+
+### Merge Adjacent/Nearby Bins for Highlighting
+
+This will get us a more interpretable set of regions to investigate.
+
+```{r}
+merged_sig <- mergeWindows(sig, tol = 300, max.width = 5000)
+
+merged_regions <- merged_sig$regions
+
+# Limit to those that are at least 3 bins wide
+merged_regions <- merged_regions[width(merged_regions) >= 300]
+
+# For testing, limit to those on chr6
+merged_regions <- merged_regions[seqnames(merged_regions) == "chr2"]
+```
+
+### Visualization
+
+Now we can do the usual viz, e.g. MA plots and tracks.
+Depending on the groups being compared, you might expect larger shifts in the MA plot than you'd expect from a typical gene-level analysis.
+SEs are relatively cell-type specific and somewhat dynamic, plus we'll be looking at the individual bins composing them.
+
+A typical MA plot is of limited utility here, but we can still generate one.
+
+```{r}
+plotMA(rezzy, alpha = 0.05)
+```
+
+### Gviz Viz
+
+This is a more complex example of how you might visualize the results of the differential analysis using Gviz.
+
+```{r}
+# Get region for SE with most DB bins
+top.db <- db.ses$REGION_ID[66]
+se.info <- se_gr[se_gr$REGION_ID == top.db,]
+
+# Genome track
+gtrack <- GenomeAxisTrack()
+itrack <- IdeogramTrack(genome = "hg38")
+
+# Annotation track
+greg <- GeneRegionTrack(TxDb.Hsapiens.UCSC.hg38.knownGene, showId=TRUE,
+    geneSymbol=TRUE, name="", background.title="transparent")
+symbols <- unlist(mapIds(org.Hs.eg.db, gene(greg), "SYMBOL",
+    "ENTREZID", multiVals = "first"))
+symbol(greg) <- symbols[gene(greg)]
+
+# SE track
+setrack <- AnnotationTrack(se_gr, genome = "hg38", name = "SEs")
+
+# SE bin data
+sigfctrack <- DataTrack(range = sig, data = -sig$log2FoldChange, name = "sig_bins_FCs", genome = "hg38", 
+                         ylim = c(-max(abs(sig$log2FoldChange)), max(abs(sig$log2FoldChange))), type = "b", 
+                     col = "orange", background.title = "orange", baseline = 0)
+
+# SE bin foldchanges
+fctrack <- DataTrack(range = res, data = -res$log2FoldChange, name = "bin_FCs", genome = "hg38", 
+                         ylim = c(-max(abs(res$log2FoldChange)), max(abs(res$log2FoldChange))), 
+                     type = "b", col = "black", background.title = "black", baseline = 0)
+
+
+# Signal Tracks
+bw_na1 <- "./example_data/bigWigs/ENCFF993DJI.naive_Bcell.H3K27ac.rep1.bigWig"
+bw_na2 <- "./example_data/bigWigs/ENCFF808SRS.naive_Bcell.H3K27ac.rep2.bigWig"
+bw_act1 <- "./example_data/bigWigs/ENCFF640GBC.activated_Bcell.H3K27ac.rep1.bigWig"
+bw_act2 <- "./example_data/bigWigs/ENCFF267CCT.activated_Bcell.H3K27ac.rep2.bigWig"
+
+naive1_track <- DataTrack(range = bw_na1, type = "l", name = "naiveB_r1", genome = "hg38", 
+                        col = "blue", background.title = "blue", ylim = c(0, 12), baseline = 0)
+naive2_track <- DataTrack(range = bw_na2, type = "l", name = "naiveB_r2", genome = "hg38", 
+                        col = "blue", background.title = "blue", ylim = c(0, 12), baseline = 0)
+act1_track <- DataTrack(range = bw_act1, type = "l", name = "activatedB_r1", genome = "hg38", 
+                        col = "red", background.title = "red", ylim = c(0, 12), baseline = 0)
+act2_track <- DataTrack(range = bw_act2, type = "l", name = "activatedB_r2", genome = "hg38", 
+                        col = "red", background.title = "red", ylim = c(0, 12), baseline = 0)
+
+# Highlight sig bins
+ht <- HighlightTrack(trackList = list(act1_track, act2_track, fctrack, sigfctrack, naive1_track, naive2_track),
+                     start = start(merged_regions), end = end(merged_regions), chromosome = as.character(seqnames(se.info)),
+                     fill = "#d3ff8c", col = "#8ff7df")
+
+plotTracks(list(gtrack, itrack, greg, setrack, ht), from = start(se.info), to = end(se.info), chromosome = as.character(seqnames(se.info)), transcriptAnnotation = "symbol", collapseTranscripts = "longest")
+```
 
 ## SessionInfo
 

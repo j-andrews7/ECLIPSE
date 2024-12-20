@@ -5,53 +5,70 @@
 \title{Run ROSE (Rank Ordering of Super-Enhancers)}
 \usage{
 run_rose(
-  sample.bam,
+  treatment,
   peaks,
-  control.bam = NULL,
+  control = NULL,
   stitch.distance = 12500,
-  exclude.tss.distance = 0,
+  tss.exclusion.distance = 0,
   txdb = NULL,
   org.db = NULL,
   drop.y = TRUE,
-  max.genes.overlap = 2,
+  max.unique.gene.tss.overlap = NULL,
+  tss.overlap.distance = 50,
   negative.to.zero = TRUE,
+  drop.no.signal = FALSE,
   thresh.method = "ROSE",
   transformation = NULL,
   floor = 1,
   read.ext = 200,
+  normalize.by.width = FALSE,
   drop.zeros = FALSE,
   first.threshold = 0.5,
-  arbitrary.threshold = 0.4
+  arbitrary.threshold = 0.4,
+  annotate = TRUE,
+  annotate.dist = 50000,
+  promoter.dist = c(2000, 200),
+  active.genes = NULL,
+  identify.active.genes = FALSE,
+  omit.unknown = TRUE
 )
 }
 \arguments{
-\item{sample.bam}{A character string or \code{BamFile} object representing the sample BAM file.}
+\item{treatment}{A \code{BamFile} or \code{GRanges} object representing the sample signal.}
 
-\item{peaks}{A character string or \code{GRanges} object representing the peaks.}
+\item{peaks}{A  \code{GRanges} object representing the peaks.}
 
-\item{control.bam}{A character string or \code{BamFile} object representing the control BAM file.
+\item{control}{A \code{BamFile} or \code{GRanges} object representing the control (usually input or IgG) signal.
 Default is \code{NULL}.}
 
 \item{stitch.distance}{Numeric value for the distance within which peaks are stitched together.
 Default is 12500.}
 
-\item{exclude.tss.distance}{Numeric value for distance from TSS to exclude peaks prior to stitching.
+\item{tss.exclusion.distance}{Numeric value for distance to add to TSS exclusion range prior to stitching.
+Peaks \emph{fully contained} within this exclusion range will be excluded from the stitching process.
 Default is 0, meaning peaks overlapping TSS will not be excluded from stitching.}
 
-\item{txdb}{Not used. Functionality not implemented.
+\item{txdb}{Transcript annotations used for peak exclusion for TSS overlap and unstitching process for
+regions spanning TSSes from more than \code{max.unique.gene.tss.overlap} genes. Also used for enhancer annotation.}
+
+\item{org.db}{An \code{OrgDb} object containing organism database information. Used for enhancer annotation.
 Default is \code{NULL}.}
 
-\item{org.db}{Not used. Functionality not implemented.
-Default is \code{NULL}.}
-
-\item{drop.y}{Logical indicating whether to drop peaks on chromosome Y.
+\item{drop.y}{Logical indicating whether to drop peaks on chromosome Y, as done by the original ROSE implementation.
 Default is \code{TRUE}.}
 
-\item{max.genes.overlap}{Not used. Functionality not implemented.
-Default is 2.}
+\item{max.unique.gene.tss.overlap}{Maximum number of unique genes that a region can overlap the TSS of before being unstitched.
+Note that multiple overlapping regions from the same gene, e.g. multiple isoforms, are counted as one.
+Default is \code{NULL}. Ignored if \code{txdb} is \code{NULL}.}
+
+\item{tss.overlap.distance}{Numeric value for the distance (in bp) to add to TSS for unstitching.
+Default is 50. Ignored if \code{txdb} is \code{NULL}.}
 
 \item{negative.to.zero}{Logical indicating whether to set negative ranking signals to zero.
 Default is \code{TRUE}.}
+
+\item{drop.no.signal}{Logical indicating whether to remove regions with negative or zero values in the ranking signal.
+Default is \code{FALSE}.}
 
 \item{thresh.method}{Character string specifying the method to determine the signal threshold.
 Must be one of "ROSE", "first", "curvature", or "arbitrary".
@@ -64,7 +81,10 @@ Default is \code{NULL}.}
 Default is 1.}
 
 \item{read.ext}{Numeric value for extending reads downstream.
-Default is 200.}
+Default is 200. Ignored if inputs are \code{GRanges} objects.}
+
+\item{normalize.by.width}{Logical indicating whether to normalize signal by region width.
+ROSE does this, but then undoes it at a later step, so \code{FALSE} is the default.}
 
 \item{drop.zeros}{Logical indicating whether to drop regions with zero signal.
 Default is \code{FALSE}.}
@@ -74,6 +94,28 @@ Default is 0.5.}
 
 \item{arbitrary.threshold}{Numeric value for the arbitrary threshold if the "arbitrary" method is selected.
 Default is 0.4.}
+
+\item{annotate}{Logical indicating whether annotations should be provided.
+Default is \code{TRUE}.}
+
+\item{annotate.dist}{Numeric specifying the flanking distance (in bp) around the region to annotate.
+Default is 50000.}
+
+\item{promoter.dist}{Integer vector of length 2, where first and second values are upstream/downstream
+distances (in bp) from the transcription start site. Used to specify the promoter region for annotations
+and determining active genes.
+Default is \code{c(2000, 200)}.}
+
+\item{active.genes}{Character vector of gene \emph{symbols} to retain in the annotations.
+Default is \code{NULL}.}
+
+\item{identify.active.genes}{Logical indicating whether active genes should be identified based on
+overlaps with \code{peaks}. Cannot be used simultaneously with \code{active.genes}.
+Default is \code{FALSE}.}
+
+\item{omit.unknown}{Logical indicating whether uncharacterized genes (i.e., gene symbols starting with \emph{LOC})
+should be excluded from annotations.
+Default is \code{TRUE}.}
 }
 \value{
 A \code{GRanges} object containing the classified super-enhancers and associated metadata.
@@ -102,10 +144,12 @@ that result in a consistent curve shape with a known maximum, like cumulative pr
 }
 }
 \examples{
+\dontrun{
 sample.bam <- "path/to/sample.bam"
 peaks <- "path/to/peaks.bed"
 result <- run_rose(sample.bam, peaks)
 }
+}
 \author{
-Jared Andrews
+Jared Andrews, Nicolas Peterson
 }

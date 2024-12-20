@@ -8,7 +8,6 @@ Authors@R: c(
     person("Kelly", "McCastlain", role = "aut"),
     person("Jacqueline", "Myers", role = "aut"),
     person("Nicolas", "Peterson", role = "aut"),
-    person("Avery", "Bradley", role = "aut"),
     person("Young Lab - Whitehead Institute for Biomedical Research", role = "cph",
     comment = "Author of included original ROSE thresholding code."))
 Description: ECLIPSE provides a performant implementation of the rank ordering of super enhancers (ROSE) method for identifying super enhancers.
@@ -18,7 +17,7 @@ Description: ECLIPSE provides a performant implementation of the rank ordering o
     It also contains visualization functions to generate high-quality plots of specific loci alongside arbitrary user-provided data.
 URL: https://github.com/stjude-biohackathon/ECLIPSE
 BugReports: https://github.com/stjude-biohackathon/ECLIPSE/issues
-License: MIT
+License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
@@ -32,13 +31,23 @@ Imports:
     Rsamtools,
     rtracklayer,
     S4Vectors,
-    stats
+    stats,
+    KneeArrower,
+    GenomeInfoDb,
+    Gviz,
+    csaw,
+    stringi,
+    data.table
 Suggests:
     BiocStyle,
     knitr,
     testthat (>= 3.0.0),
     rmarkdown,
-    ENCODExplorer
+    BiocFileCache,
+    TxDb.Hsapiens.UCSC.hg38.knownGene,
+    org.Hs.eg.db,
+    DESeq2,
+    apeglm
 Depends:
     R (>= 4.4.0)
 biocViews: 

@@ -4,28 +4,35 @@
 \alias{add_signal_rank}
 \title{Get ranking signal for regions and add to GRanges object}
 \usage{
-add_signal_rank(regions, negative.to.zero = TRUE)
+add_signal_rank(regions, negative.to.zero = TRUE, drop.no.signal = FALSE)
 }
 \arguments{
-\item{regions}{A GRanges object containing the \code{sample_signal} and optionally \code{control_signal} in metadata columns.}
+\item{regions}{A \code{GRanges} object containing the \code{sample_signal} and optionally \code{control_signal} in metadata columns.}
 
 \item{negative.to.zero}{Logical indicating whether to set negative values in the ranking signal to zero.
 Default is \code{TRUE}, as that is what ROSE does.}
+
+\item{drop.no.signal}{Logical indicating whether to remove regions with negative or zero values in the ranking signal.
+Default is \code{FALSE}.}
 }
 \value{
-A GRanges object with an added \code{rank_signal} column containing the
+A \code{GRanges} object with an added \code{rank_signal} column containing the
 computed \code{rank_signal} column in its metadata columns, sorted by said column.
-Adds a \code{region_rank} column as well. Adds a \code{control_subtracted} element to the \code{metadata}.
+Adds a \code{region_rank} column as well.
+Adds a \code{control_subtracted} element to the \code{metadata}.
 }
 \description{
 Computes the ranking signal for the given genomic regions by
 optionally subtracting control signal and setting negative values to zero.
 }
 \examples{
-regions <- GRanges(seqnames = "chr1", ranges = IRanges(1000, 2000))
+library(GenomicRanges)
+regions <- GRanges(seqnames = c("chr1", "chr2", "chr3"),
+                   ranges = IRanges(start = c(100, 200, 300),
+                   end = c(200, 300, 400)))
 regions$sample_signal <- rnorm(length(regions))
 regions$control_signal <- rnorm(length(regions))
-ranked_regions <- get_ranking_signal(regions)
+ranked_regions <- add_signal_rank(regions)
 }
 \author{
 Jared Andrews, Jacqueline Myers
