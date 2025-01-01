@@ -4,14 +4,14 @@
 \alias{get_second_diff}
 \title{Multiple Inflection Points via Second Difference}
 \usage{
-get_second_diff(x, y, use_threshold = FALSE, threshold = 0)
+get_second_diff(x, y, use.threshold = FALSE, threshold = 0)
 }
 \arguments{
 \item{x}{Numeric vector of x-values (ideally sorted).}
 
 \item{y}{Numeric vector of y-values of the same length as \code{x}.}
 
-\item{use_threshold}{Logical indicating whether to only consider second-difference
+\item{use.threshold}{Logical indicating whether to only consider second-difference
 peaks above \code{threshold}.}
 
 \item{threshold}{Numeric value for the minimum magnitude of the second difference.}

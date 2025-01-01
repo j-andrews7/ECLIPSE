@@ -6,7 +6,7 @@
 #'
 #' @param x Numeric vector of x-values (ideally sorted).
 #' @param y Numeric vector of y-values of the same length as `x`.
-#' @param use_threshold Logical indicating whether to only consider second-difference
+#' @param use.threshold Logical indicating whether to only consider second-difference
 #'   peaks above `threshold`.
 #' @param threshold Numeric value for the minimum magnitude of the second difference.
 #'
@@ -42,7 +42,7 @@
 #' res_sd$inflection_xs
 #' res_sd$inflection_ys
 get_second_diff <- function(x, y,
-                            use_threshold = FALSE,
+                            use.threshold = FALSE,
                             threshold = 0.0) {
     n <- length(x)
     if (n < 3) {
@@ -59,7 +59,7 @@ get_second_diff <- function(x, y,
         right <- if (i == length(ddy)) 0 else abs(ddy[i + 1])
 
         is_local_max <- (mid > left) && (mid >= right)
-        meets_threshold <- (!use_threshold) || (mid > threshold)
+        meets_threshold <- (!use.threshold) || (mid > threshold)
 
         if (is_local_max && meets_threshold) {
             # i in [1, n-2], so the corresponding x,y index is i+1
@@ -87,7 +87,7 @@ get_second_diff <- function(x, y,
 #'
 #' @param x Numeric vector of x-values.
 #' @param y Numeric vector of y-values of the same length as `x`.
-#' @param n_breakpoints Integer number of breakpoints to identify (>=1).
+#' @param n.breakpoints Integer number of breakpoints to identify (>=1).
 #'
 #' @return A list with:
 #' * `model_break_xs`: The **model-estimated** x-coordinates of each breakpoint.
@@ -98,7 +98,7 @@ get_second_diff <- function(x, y,
 #'
 #' @details
 #' 1. Fit `lm(y ~ x)`.
-#' 2. Pass this to `segmented::segmented()`, requesting `n_breakpoints`.
+#' 2. Pass this to `segmented::segmented()`, requesting `n.breakpoints`.
 #' 3. Extract the x-locations from `segfit$psi`, then predict y-values at those points.
 #' 4. For each estimated breakpoint, find the **nearest actual x** in the data
 #'    (via `which.min(abs(x - bps_x[i]))`), and return the corresponding
@@ -118,7 +118,7 @@ get_second_diff <- function(x, y,
 #' x_data <- seq(500)
 #' y_data <- 1 * exp(0.02 * (x_data - 1))
 #'
-#' res_seg <- get_segmented(x_data, y_data, n_breakpoints = 1)
+#' res_seg <- get_segmented(x_data, y_data, n.breakpoints = 1)
 #' res_seg$model_break_xs # Model-estimated x
 #' res_seg$model_break_ys # Predicted y from model at that x
 #' res_seg$closest_xs # Actual data x nearest the model breakpoint
@@ -128,18 +128,18 @@ get_second_diff <- function(x, y,
 #' x_data2 <- seq(500)
 #' y_data2 <- 1 / (1 + exp(-0.02 * (x_data2 - 250)))
 #'
-#' res_seg2 <- get_segmented(x_data2, y_data2, n_breakpoints = 2)
+#' res_seg2 <- get_segmented(x_data2, y_data2, n.breakpoints = 2)
 #' res_seg2$model_break_xs
 #' res_seg2$closest_xs
-get_segmented <- function(x, y, n_breakpoints = 2) {
-    if (n_breakpoints < 1) {
+get_segmented <- function(x, y, n.breakpoints = 2) {
+    if (n.breakpoints < 1) {
         stop("Number of breakpoints must be >= 1.")
     }
 
     df <- data.frame(x = x, y = y)
     lmfit <- lm(y ~ x, data = df)
 
-    segfit <- segmented::segmented(lmfit, seg.Z = ~x, npsi = n_breakpoints)
+    segfit <- segmented::segmented(lmfit, seg.Z = ~x, npsi = n.breakpoints)
 
     # Extract model-estimated breakpoints in x and predicted y at those x
     model_bps_x <- segfit$psi[, 2] # second column are the estimates
@@ -173,7 +173,7 @@ get_segmented <- function(x, y, n_breakpoints = 2) {
 #'
 #' @param x Numeric vector of x-values (sorted or strictly increasing).
 #' @param y Numeric vector of y-values of the same length as `x`.
-#' @param use_threshold Logical; if `TRUE`, only local maxima with distance
+#' @param use.threshold Logical; if `TRUE`, only local maxima with distance
 #'   `>= threshold` are kept.
 #' @param threshold Numeric distance threshold.
 #'
@@ -208,7 +208,7 @@ get_segmented <- function(x, y, n_breakpoints = 2) {
 #' res_chord$inflection_xs
 #' res_chord$inflection_ys
 get_chord_distance <- function(x, y,
-                               use_threshold = FALSE,
+                               use.threshold = FALSE,
                                threshold = 0.0) {
     n <- length(x)
     if (n < 2) {
@@ -250,7 +250,7 @@ get_chord_distance <- function(x, y,
         right <- distances[i + 1]
 
         is_local_max <- (mid >= left) && (mid >= right)
-        meets_thresh <- (!use_threshold) || (mid >= threshold)
+        meets_thresh <- (!use.threshold) || (mid >= threshold)
 
         if (is_local_max && meets_thresh) {
             candidate_idxs <- c(candidate_idxs, i)

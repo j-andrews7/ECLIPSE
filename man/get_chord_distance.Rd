@@ -4,14 +4,14 @@
 \alias{get_chord_distance}
 \title{Multiple Elbows via Chord Distance (Local Maxima)}
 \usage{
-get_chord_distance(x, y, use_threshold = FALSE, threshold = 0)
+get_chord_distance(x, y, use.threshold = FALSE, threshold = 0)
 }
 \arguments{
 \item{x}{Numeric vector of x-values (sorted or strictly increasing).}
 
 \item{y}{Numeric vector of y-values of the same length as \code{x}.}
 
-\item{use_threshold}{Logical; if \code{TRUE}, only local maxima with distance
+\item{use.threshold}{Logical; if \code{TRUE}, only local maxima with distance
 \verb{>= threshold} are kept.}
 
 \item{threshold}{Numeric distance threshold.}

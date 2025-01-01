@@ -4,14 +4,14 @@
 \alias{get_segmented}
 \title{Multiple Breakpoints via Piecewise Linear Regression}
 \usage{
-get_segmented(x, y, n_breakpoints = 2)
+get_segmented(x, y, n.breakpoints = 2)
 }
 \arguments{
 \item{x}{Numeric vector of x-values.}
 
 \item{y}{Numeric vector of y-values of the same length as \code{x}.}
 
-\item{n_breakpoints}{Integer number of breakpoints to identify (>=1).}
+\item{n.breakpoints}{Integer number of breakpoints to identify (>=1).}
 }
 \value{
 A list with:
@@ -33,7 +33,7 @@ Additionally, we find the \strong{closest actual data point} (in the original
 \verb{x,y} vectors) to each estimated breakpoint and return those, too.
 \enumerate{
 \item Fit \code{lm(y ~ x)}.
-\item Pass this to \code{segmented::segmented()}, requesting \code{n_breakpoints}.
+\item Pass this to \code{segmented::segmented()}, requesting \code{n.breakpoints}.
 \item Extract the x-locations from \code{segfit$psi}, then predict y-values at those points.
 \item For each estimated breakpoint, find the \strong{nearest actual x} in the data
 (via \code{which.min(abs(x - bps_x[i]))}), and return the corresponding
@@ -49,7 +49,7 @@ and \code{closest_ys} let you see which real data points are nearest those break
 x_data <- seq(500)
 y_data <- 1 * exp(0.02 * (x_data - 1))
 
-res_seg <- get_segmented(x_data, y_data, n_breakpoints = 1)
+res_seg <- get_segmented(x_data, y_data, n.breakpoints = 1)
 res_seg$model_break_xs # Model-estimated x
 res_seg$model_break_ys # Predicted y from model at that x
 res_seg$closest_xs # Actual data x nearest the model breakpoint
@@ -59,7 +59,7 @@ res_seg$closest_ys # Actual data y for that nearest x
 x_data2 <- seq(500)
 y_data2 <- 1 / (1 + exp(-0.02 * (x_data2 - 250)))
 
-res_seg2 <- get_segmented(x_data2, y_data2, n_breakpoints = 2)
+res_seg2 <- get_segmented(x_data2, y_data2, n.breakpoints = 2)
 res_seg2$model_break_xs
 res_seg2$closest_xs
 }
