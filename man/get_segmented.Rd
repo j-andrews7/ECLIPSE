@@ -9,9 +9,9 @@ get_segmented(x, y, n_breakpoints = 2)
 \arguments{
 \item{x}{Numeric vector of x-values.}
 
-\item{y}{Numeric vector of y-values (same length).}
+\item{y}{Numeric vector of y-values of the same length as \code{x}.}
 
-\item{n_breakpoints}{Integer number of breakpoints (>=1).}
+\item{n_breakpoints}{Integer number of breakpoints to identify (>=1).}
 }
 \value{
 A list with:

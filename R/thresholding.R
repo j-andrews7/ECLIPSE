@@ -86,8 +86,8 @@ get_second_diff <- function(x, y,
 #' `x,y` vectors) to each estimated breakpoint and return those, too.
 #'
 #' @param x Numeric vector of x-values.
-#' @param y Numeric vector of y-values (same length).
-#' @param n_breakpoints Integer number of breakpoints (>=1).
+#' @param y Numeric vector of y-values of the same length as `x`.
+#' @param n_breakpoints Integer number of breakpoints to identify (>=1).
 #'
 #' @return A list with:
 #' * `model_break_xs`: The **model-estimated** x-coordinates of each breakpoint.
@@ -172,7 +172,7 @@ get_segmented <- function(x, y, n_breakpoints = 2) {
 #' above a threshold, as candidate elbows.
 #'
 #' @param x Numeric vector of x-values (sorted or strictly increasing).
-#' @param y Numeric vector of y-values (same length).
+#' @param y Numeric vector of y-values of the same length as `x`.
 #' @param use_threshold Logical; if `TRUE`, only local maxima with distance
 #'   `>= threshold` are kept.
 #' @param threshold Numeric distance threshold.
