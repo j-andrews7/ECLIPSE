@@ -4,7 +4,7 @@
 \alias{get_chord_distance}
 \title{Multiple Elbows via Chord Distance (Local Maxima)}
 \usage{
-get_chord_distance(x, y, use.threshold = FALSE, threshold = 0)
+get_chord_distance(x, y, use.threshold = TRUE, threshold = 0)
 }
 \arguments{
 \item{x}{Numeric vector of x-values (sorted or strictly increasing).}
@@ -38,19 +38,18 @@ above a threshold, as candidate elbows.
 }
 }
 \examples{
-# Exponential data
 x_data <- seq(500)
+# Exponential data
 y_data <- 1 * exp(0.02 * (x_data - 1))
+
+# Sigmoidal
+y_data2 <- 1 / (1 + exp(-0.02 * (x_data - 250)))
 
 res_chord <- get_chord_distance(x_data, y_data)
 res_chord$inflection_xs
 res_chord$inflection_ys
 
-# Sigmoidal data
-x_data <- seq(500)
-y_data <- 1 / (1 + exp(-0.02 * (x_data - 250)))
-
-res_chord <- get_chord_distance(x_data, y_data)
+res_chord <- get_chord_distance(x_data, y_data2)
 res_chord$inflection_xs
 res_chord$inflection_ys
 }

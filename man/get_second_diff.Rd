@@ -4,7 +4,7 @@
 \alias{get_second_diff}
 \title{Multiple Inflection Points via Second Difference}
 \usage{
-get_second_diff(x, y, use.threshold = FALSE, threshold = 0)
+get_second_diff(x, y, use.threshold = TRUE, threshold = 0)
 }
 \arguments{
 \item{x}{Numeric vector of x-values (ideally sorted).}
@@ -38,20 +38,18 @@ a numeric series. We look for \emph{local maxima} in the absolute second differe
 }
 }
 \examples{
-# Exponential data
 x_data <- seq(500)
+# Exponential data
 y_data <- 1 * exp(0.02 * (x_data - 1))
+
+# Sigmoidal
+y_data2 <- 1 / (1 + exp(-0.02 * (x_data - 250)))
 
 res_sd <- get_second_diff(x_data, y_data)
 res_sd$inflection_xs
 res_sd$inflection_ys
 
-# Sigmoidal data
-x_data <- seq(500)
-y_data <- 1 / (1 + exp(-0.02 * (x_data - 250)))
-
-# Find multiple inflection points
-res_sd <- get_second_diff(x_data, y_data)
+res_sd <- get_second_diff(x_data, y_data2)
 res_sd$inflection_xs
 res_sd$inflection_ys
 }

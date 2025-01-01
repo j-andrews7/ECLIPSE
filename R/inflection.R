@@ -25,25 +25,23 @@
 #' @author Jared Andrews
 #'
 #' @examples
-#' # Exponential data
 #' x_data <- seq(500)
+#' # Exponential data
 #' y_data <- 1 * exp(0.02 * (x_data - 1))
+#'
+#' # Sigmoidal
+#' y_data2 <- 1 / (1 + exp(-0.02 * (x_data - 250)))
 #'
 #' res_sd <- get_second_diff(x_data, y_data)
 #' res_sd$inflection_xs
 #' res_sd$inflection_ys
 #'
-#' # Sigmoidal data
-#' x_data <- seq(500)
-#' y_data <- 1 / (1 + exp(-0.02 * (x_data - 250)))
-#'
-#' # Find multiple inflection points
-#' res_sd <- get_second_diff(x_data, y_data)
+#' res_sd <- get_second_diff(x_data, y_data2)
 #' res_sd$inflection_xs
 #' res_sd$inflection_ys
 get_second_diff <- function(x, y,
-                            use.threshold = FALSE,
-                            threshold = 0.0) {
+                            use.threshold = TRUE,
+                            threshold = 0) {
     n <- length(x)
     if (n < 3) {
         stop("Need at least 3 points for second-difference approach.")
@@ -114,9 +112,12 @@ get_second_diff <- function(x, y,
 #' @author Jared Andrews
 #'
 #' @examples
-#' # Exponential data
 #' x_data <- seq(500)
+#' # Exponential data
 #' y_data <- 1 * exp(0.02 * (x_data - 1))
+#'
+#' # Sigmoidal
+#' y_data2 <- 1 / (1 + exp(-0.02 * (x_data - 250)))
 #'
 #' res_seg <- get_segmented(x_data, y_data, n.breakpoints = 1)
 #' res_seg$model_break_xs # Model-estimated x
@@ -124,11 +125,7 @@ get_second_diff <- function(x, y,
 #' res_seg$closest_xs # Actual data x nearest the model breakpoint
 #' res_seg$closest_ys # Actual data y for that nearest x
 #'
-#' # Sigmoidal data
-#' x_data2 <- seq(500)
-#' y_data2 <- 1 / (1 + exp(-0.02 * (x_data2 - 250)))
-#'
-#' res_seg2 <- get_segmented(x_data2, y_data2, n.breakpoints = 2)
+#' res_seg2 <- get_segmented(x_data, y_data2, n.breakpoints = 2)
 #' res_seg2$model_break_xs
 #' res_seg2$closest_xs
 get_segmented <- function(x, y, n.breakpoints = 2) {
@@ -192,24 +189,23 @@ get_segmented <- function(x, y, n.breakpoints = 2) {
 #' @author Jared Andrews
 #'
 #' @examples
-#' # Exponential data
 #' x_data <- seq(500)
+#' # Exponential data
 #' y_data <- 1 * exp(0.02 * (x_data - 1))
+#'
+#' # Sigmoidal
+#' y_data2 <- 1 / (1 + exp(-0.02 * (x_data - 250)))
 #'
 #' res_chord <- get_chord_distance(x_data, y_data)
 #' res_chord$inflection_xs
 #' res_chord$inflection_ys
 #'
-#' # Sigmoidal data
-#' x_data <- seq(500)
-#' y_data <- 1 / (1 + exp(-0.02 * (x_data - 250)))
-#'
-#' res_chord <- get_chord_distance(x_data, y_data)
+#' res_chord <- get_chord_distance(x_data, y_data2)
 #' res_chord$inflection_xs
 #' res_chord$inflection_ys
 get_chord_distance <- function(x, y,
-                               use.threshold = FALSE,
-                               threshold = 0.0) {
+                               use.threshold = TRUE,
+                               threshold = 0) {
     n <- length(x)
     if (n < 2) {
         stop("Need at least 2 points for chord method.")

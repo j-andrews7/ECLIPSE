@@ -550,8 +550,24 @@ classify_enhancers <- function(regions,
 #' @param drop.no.signal Logical indicating whether to remove regions with negative or zero values in the ranking signal.
 #'   Default is `FALSE`.
 #' @param thresh.method Character string specifying the method to determine the signal threshold.
-#'   Must be one of "ROSE", "first", "curvature", or "arbitrary".
+#'   Must be one of "ROSE", "first", "second_diff", "segmented", "chord", "curvature", or "arbitrary".
 #'   Default is "ROSE".
+#' @param first.threshold Numeric value for the fraction of steepest slope when using the "first" threshold method.
+#'   Default is 0.5.
+#' @param second_diff.threshold Numeric value for ignoring small differences when using the "second_diff" threshold method.
+#'   May be useful for transformation that result in curves with small differences.
+#'   Generally, unlikely to be useful for most applications.
+#'   Default is 0.
+#' @param chord.threshold Numeric value for ignoring small differences when using the "chord" threshold method.
+#'   May be useful for transformation that result in curves with small differences.
+#' Generally, unlikely to be useful for most applications.
+#'   Default is 0.
+#' @param arbitrary.threshold Numeric value for the arbitrary threshold if the "arbitrary" threshold method is selected.
+#'   Useful for scaled transformations like cumulative proportion of signal.
+#'   Default is 0.4.
+#' @param segmented.breakpoints Number of breakpoints to find when using the "segmented" threshold method.
+#'   Generally, this should be set to the rough number of linear segments in the curve.
+#'   Default is 3.
 #' @param transformation A function to apply to the ranking signal before threshold determination.
 #'   Default is `NULL`.
 #' @param floor Numeric value representing the minimum coverage threshold to count.
@@ -562,28 +578,27 @@ classify_enhancers <- function(regions,
 #'   ROSE does this, but then undoes it at a later step, so `FALSE` is the default.
 #' @param drop.zeros Logical indicating whether to drop regions with zero signal.
 #'   Default is `FALSE`.
-#' @param first.threshold Numeric value for the fraction of steepest slope when using the "first" threshold method.
-#'   Default is 0.5.
-#' @param arbitrary.threshold Numeric value for the arbitrary threshold if the "arbitrary" method is selected.
-#'   Default is 0.4.
 #' @param annotate Logical indicating whether annotations should be provided.
 #'   Default is `TRUE`.
-#' @param annotate.dist Numeric specifying the flanking distance (in bp) around the region to annotate.
+#' @param annotate.dist Numeric specifying the flanking distance (in bp) around the region to use
+#'   for annotation, i.e. genes within this distance will be associated with the region.
 #'   Default is 50000.
 #' @param promoter.dist Integer vector of length 2, where first and second values are upstream/downstream
 #'   distances (in bp) from the transcription start site. Used to specify the promoter region for annotations
 #'   and determining active genes.
 #'   Default is `c(2000, 200)`.
 #' @param active.genes Character vector of gene *symbols* to retain in the annotations.
+#'   Can be useful for retaining only expressed genes.
 #'   Default is `NULL`.
 #' @param identify.active.genes Logical indicating whether active genes should be identified based on
-#'   overlaps with `peaks`. Cannot be used simultaneously with `active.genes`.
+#'   overlaps with `peaks`. Will be ignored if `active.genes` provided.
 #'   Default is `FALSE`.
 #' @param omit.unknown Logical indicating whether uncharacterized genes (i.e., gene symbols starting with *LOC*)
 #'   should be excluded from annotations.
 #'   Default is `TRUE`.
 #'
-#' @return A `GRanges` object containing the classified super-enhancers and associated metadata.
+#' @return A `GRanges` object containing the classified regions and associated metadata of each,
+#'   including super enhancer status.
 #'
 #' @author Jared Andrews, Nicolas Peterson
 #'
@@ -615,13 +630,14 @@ run_rose <- function(
     negative.to.zero = TRUE,
     drop.no.signal = FALSE,
     thresh.method = "ROSE",
+    first.threshold = 0.5,
+    arbitrary.threshold = 0.4,
+    segmented.breakpoints = 3,
     transformation = NULL,
     floor = 1,
     read.ext = 200,
     normalize.by.width = FALSE,
     drop.zeros = FALSE,
-    first.threshold = 0.5,
-    arbitrary.threshold = 0.4,
     annotate = TRUE,
     annotate.dist = 50000,
     promoter.dist = c(2000, 200),
@@ -642,6 +658,11 @@ run_rose <- function(
     # Check that peaks is a GRanges object
     if (!is(peaks, "GRanges")) {
         stop("peaks must be a GRanges object")
+    }
+
+    # Check that thresh.method is valid
+    if (!thresh.method %in% c("ROSE", "first", "second_diff", "curvature", "segmented", "chord", "arbitrary")) {
+        stop("thresh.method must be one of 'ROSE', 'first', 'second_diff', 'curvature', 'segmented', 'chord', or 'arbitrary'")
     }
 
     if (is(treatment, "BamFile")) {

@@ -45,9 +45,12 @@ rather are estimated for an optimal piecewise fit. The additional \code{closest_
 and \code{closest_ys} let you see which real data points are nearest those break estimates.
 }
 \examples{
-# Exponential data
 x_data <- seq(500)
+# Exponential data
 y_data <- 1 * exp(0.02 * (x_data - 1))
+
+# Sigmoidal
+y_data2 <- 1 / (1 + exp(-0.02 * (x_data - 250)))
 
 res_seg <- get_segmented(x_data, y_data, n.breakpoints = 1)
 res_seg$model_break_xs # Model-estimated x
@@ -55,11 +58,7 @@ res_seg$model_break_ys # Predicted y from model at that x
 res_seg$closest_xs # Actual data x nearest the model breakpoint
 res_seg$closest_ys # Actual data y for that nearest x
 
-# Sigmoidal data
-x_data2 <- seq(500)
-y_data2 <- 1 / (1 + exp(-0.02 * (x_data2 - 250)))
-
-res_seg2 <- get_segmented(x_data2, y_data2, n.breakpoints = 2)
+res_seg2 <- get_segmented(x_data, y_data2, n.breakpoints = 2)
 res_seg2$model_break_xs
 res_seg2$closest_xs
 }
