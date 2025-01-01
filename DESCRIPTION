@@ -47,7 +47,8 @@ Suggests:
     TxDb.Hsapiens.UCSC.hg38.knownGene,
     org.Hs.eg.db,
     DESeq2,
-    apeglm
+    apeglm,
+    segmented
 Depends:
     R (>= 4.4.0)
 biocViews: 
