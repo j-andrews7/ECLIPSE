@@ -260,3 +260,114 @@ get_chord_distance <- function(x, y,
         distances          = distances
     )
 }
+
+
+#' Find Points Closest to n*MAD from the Median
+#'
+#' This function identifies the point(s) in the data whose `y`-value is
+#' *closest* to \eqn{\mathrm{median}(y) \pm n \times \mathrm{MAD}(y)}.
+#' In other words, it picks an actual data point near the "(n) MAD boundary"
+#' (upper, lower, or both).
+#'
+#' @param x A numeric vector of x-values (same length as `y`).
+#' @param y A numeric vector of y-values (same length as `x`).
+#' @param n Numeric value for the number of MADs to use.
+#'   3 by default.
+#' @param direction One of "upper", "lower", or "both":
+#'   - **"upper"**: Find the data point nearest \eqn{\mathrm{median}(y) + n \times \mathrm{MAD}(y)}.
+#'   - **"lower"**: Find the data point nearest \eqn{\mathrm{median}(y) - n \times \mathrm{MAD}(y)}.
+#'   - **"both"**: Return two points: one near the upper boundary and one near the lower boundary.
+#'
+#' @return A list with:
+#'   - `median_y`: The median of `y`.
+#'   - `mad_y`: The median absolute deviation of `y`.
+#'   - `upper_threshold`: \eqn{\mathrm{median}(y) + n \times \mathrm{MAD}(y)}.
+#'   - `lower_threshold`: \eqn{\mathrm{median}(y) - n \times \mathrm{MAD}(y)}.
+#'   - `break_xs`: The x-values closest to the chosen threshold(s).
+#'   - `break_ys`: The corresponding y-values.
+#'   - `indices`: The indices in `x,y` for these breakpoints.
+#'
+#' @details
+#' 1. We compute:
+#'    \deqn{
+#'      m = \mathrm{median}(y), \quad
+#'      a = \mathrm{MAD}(y)
+#'    }
+#' 2. Define:
+#'    \deqn{
+#'      \mathrm{upper} = m + (n)a, \quad
+#'      \mathrm{lower} = m - (n)a
+#'    }
+#' 3. For each threshold requested (*upper*, *lower*, or *both*),
+#'    we find the index \eqn{i} that minimizes
+#'    \eqn{| y[i] - \mathrm{threshold} |}.
+#' 4. We return those `x[i]`, `y[i]` as the "breakpoints."
+#'
+#' This is a simple “rule-of-thumb” method: once the data cross
+#' roughly \eqn{\pm n \times \mathrm{MAD}} from the center, we call that a
+#' "significant departure." It doesn't use ranking or second derivatives—just
+#' a robust measure of spread to define the boundary.
+#'
+#' @importFrom stats mad median
+#' @export
+#' @author Jared Andrews
+#'
+#' @seealso \code{\link[stats]{mad}}
+#'
+#' @examples
+#' x_data <- seq(500)
+#' # Exponential data
+#' y_data <- 1 * exp(0.02 * (x_data - 1))
+#'
+#' # Sigmoidal
+#' y_data2 <- 1 / (1 + exp(-0.02 * (x_data - 250)))
+#'
+#' res_mad <- get_mad(x_data, y_data, n = 3, direction = "upper")
+#' res_mad$break_xs
+#' res_mad$break_ys
+#'
+#' res_mad <- get_mad(x_data, y_data2, n = 3, direction = "upper")
+#' res_mad$break_xs
+#' res_mad$break_ys
+get_mad <- function(x, y,
+                    n = 3,
+                    direction = c("upper", "lower", "both")
+                    ) {
+    direction <- match.arg(direction)
+
+    if (length(x) != length(y)) {
+        stop("x and y must have the same length.")
+    }
+
+    m <- median(y)
+    a <- mad(y, center = m)
+
+    up_thresh <- m + (n * a)
+    low_thresh <- m - (n * a)
+
+    # Function to find index of the data point closest to a threshold th
+    find_closest_idx <- function(th) {
+        deltas <- abs(y - th)
+        which.min(deltas)
+    }
+
+    breakpoint_indices <- integer(0)
+    if (direction %in% c("upper", "both")) {
+        i_up <- find_closest_idx(up_thresh)
+        breakpoint_indices <- c(breakpoint_indices, i_up)
+    }
+    if (direction %in% c("lower", "both")) {
+        i_low <- find_closest_idx(low_thresh)
+        breakpoint_indices <- c(breakpoint_indices, i_low)
+    }
+
+    list(
+        median_y        = m,
+        mad_y           = a,
+        upper_threshold = up_thresh,
+        lower_threshold = low_thresh,
+        break_xs        = x[breakpoint_indices],
+        break_ys        = y[breakpoint_indices],
+        indices         = breakpoint_indices
+    )
+}

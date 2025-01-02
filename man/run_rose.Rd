@@ -19,8 +19,11 @@ run_rose(
   drop.no.signal = FALSE,
   thresh.method = "ROSE",
   first.threshold = 0.5,
+  second_diff.threshold = 0,
+  chord.threshold = 0,
   arbitrary.threshold = 0.4,
   segmented.breakpoints = 3,
+  mads = 3,
   transformation = NULL,
   floor = 1,
   read.ext = 200,
@@ -72,11 +75,22 @@ Default is \code{TRUE}.}
 Default is \code{FALSE}.}
 
 \item{thresh.method}{Character string specifying the method to determine the signal threshold.
-Must be one of "ROSE", "first", "second_diff", "segmented", "chord", "curvature", or "arbitrary".
+Must be one of "ROSE", "first", "second_diff", "segmented", "chord", "curvature", "mad", or "arbitrary".
 Default is "ROSE".}
 
 \item{first.threshold}{Numeric value for the fraction of steepest slope when using the "first" threshold method.
+Higher value will result in fewer SEs called.
 Default is 0.5.}
+
+\item{second_diff.threshold}{Numeric value for ignoring small differences when using the "second_diff" threshold method.
+May be useful for transformation that result in curves with small differences.
+Generally, unlikely to be useful for most applications.
+Default is 0.}
+
+\item{chord.threshold}{Numeric value for ignoring small differences when using the "chord" threshold method.
+May be useful for transformation that result in curves with small differences.
+Generally, unlikely to be useful for most applications.
+Default is 0.}
 
 \item{arbitrary.threshold}{Numeric value for the arbitrary threshold if the "arbitrary" threshold method is selected.
 Useful for scaled transformations like cumulative proportion of signal.
@@ -84,6 +98,10 @@ Default is 0.4.}
 
 \item{segmented.breakpoints}{Number of breakpoints to find when using the "segmented" threshold method.
 Generally, this should be set to the rough number of linear segments in the curve.
+Default is 3.}
+
+\item{mads}{Numeric value for the number of median absolute deviations to use for the "mad" threshold method.
+Increasing will reduce the number of SEs called.
 Default is 3.}
 
 \item{transformation}{A function to apply to the ranking signal before threshold determination.
@@ -124,16 +142,6 @@ Default is \code{FALSE}.}
 \item{omit.unknown}{Logical indicating whether uncharacterized genes (i.e., gene symbols starting with \emph{LOC})
 should be excluded from annotations.
 Default is \code{TRUE}.}
-
-\item{second_diff.threshold}{Numeric value for ignoring small differences when using the "second_diff" threshold method.
-May be useful for transformation that result in curves with small differences.
-Generally, unlikely to be useful for most applications.
-Default is 0.}
-
-\item{chord.threshold}{Numeric value for ignoring small differences when using the "chord" threshold method.
-May be useful for transformation that result in curves with small differences.
-Generally, unlikely to be useful for most applications.
-Default is 0.}
 }
 \value{
 A \code{GRanges} object containing the classified regions and associated metadata of each,

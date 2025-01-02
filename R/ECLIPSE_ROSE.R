@@ -44,9 +44,9 @@ extend_reads <- function(regions, upstream = 0, downstream = 0) {
 #' @param stitched A `GRanges` object representing the stitched regions.
 #' @param original A `GRanges` object representing the original regions prior to stitching.
 #' @param tss A `GRanges` object representing the TSS regions.
-#' @param id.col A character string specifying the column name in the TSS object that contains gene IDs. 
+#' @param id.col A character string specifying the column name in the TSS object that contains gene IDs.
 #'   Default is "GENEID".
-#' @param threshold An integer specifying the threshold for the number of unique genes before unstitching is applied. 
+#' @param threshold An integer specifying the threshold for the number of unique genes before unstitching is applied.
 #'   Default is 2.
 #'
 #' @return A list with a `hits` data.frame with the following columns:
@@ -71,26 +71,38 @@ extend_reads <- function(regions, upstream = 0, downstream = 0) {
 #'
 #' @examples
 #' library(GenomicRanges)
-#' 
+#'
 #' # Example stitched regions, original peaks, and TSSes
-#' stitched <- GRanges(seqnames = c("chr1", "chr1", "chr2"),
-#'                     ranges = IRanges(start = c(100, 300, 500),
-#'                     end = c(200, 400, 600)),
-#'                     strand = c("+", "-", "+"))
-#' 
-#' original <- GRanges(seqnames = c("chr1", "chr1", "chr2", "chr2"),
-#'                     ranges = IRanges(start = c(100, 150, 300, 500),
-#'                     end = c(150, 200, 350, 550)),
-#'                     strand = c("+", "+", "-", "+"))
-#' 
-#' tss <- GRanges(seqnames = c("chr1", "chr1", "chr1", "chr1", "chr2"),
-#'                ranges = IRanges(start = c(120, 140, 160, 320, 520), 
-#'                end = c(130, 150, 170, 330, 530)),
-#'                strand = c("+", "+", "+", "-", "+"),
-#'                GENEID = c("gene1", "gene11", "gene111", "gene2", "gene3"))
-#' 
+#' stitched <- GRanges(
+#'     seqnames = c("chr1", "chr1", "chr2"),
+#'     ranges = IRanges(
+#'         start = c(100, 300, 500),
+#'         end = c(200, 400, 600)
+#'     ),
+#'     strand = c("+", "-", "+")
+#' )
+#'
+#' original <- GRanges(
+#'     seqnames = c("chr1", "chr1", "chr2", "chr2"),
+#'     ranges = IRanges(
+#'         start = c(100, 150, 300, 500),
+#'         end = c(150, 200, 350, 550)
+#'     ),
+#'     strand = c("+", "+", "-", "+")
+#' )
+#'
+#' tss <- GRanges(
+#'     seqnames = c("chr1", "chr1", "chr1", "chr1", "chr2"),
+#'     ranges = IRanges(
+#'         start = c(120, 140, 160, 320, 520),
+#'         end = c(130, 150, 170, 330, 530)
+#'     ),
+#'     strand = c("+", "+", "+", "-", "+"),
+#'     GENEID = c("gene1", "gene11", "gene111", "gene2", "gene3")
+#' )
+#'
 #' result <- unstitch_regions(stitched, original, tss, id.col = "GENEID", threshold = 2)
-#' 
+#'
 #' result$regions
 unstitch_regions <- function(stitched, original, tss, id.col = "GENEID", threshold = 2) {
     # Find overlaps between stitched regions and TSS regions
@@ -162,7 +174,7 @@ unstitch_regions <- function(stitched, original, tss, id.col = "GENEID", thresho
 #'     ROSE does this manually by calling samtools for each region, which is slow.
 #' - Basepairs with coverage below a specified threshold (`floor`, 1 by default) are removed.
 #' - For each region, the coverage is summed and divided by the total number of reads to get the signal.
-#' 
+#'
 #'  To detail the process for a provided `GRanges` object:
 #' - The weighted coverage for each basepair in the regions of interest are calculated using the `score` value.
 #' - Basepairs with coverage below a specified threshold (`floor`, 1 by default) are removed.
@@ -348,9 +360,13 @@ add_region_signal <- function(treatment,
 #'
 #' @examples
 #' library(GenomicRanges)
-#' regions <- GRanges(seqnames = c("chr1", "chr2", "chr3"),
-#'                    ranges = IRanges(start = c(100, 200, 300),
-#'                    end = c(200, 300, 400)))
+#' regions <- GRanges(
+#'     seqnames = c("chr1", "chr2", "chr3"),
+#'     ranges = IRanges(
+#'         start = c(100, 200, 300),
+#'         end = c(200, 300, 400)
+#'     )
+#' )
 #' regions$sample_signal <- rnorm(length(regions))
 #' regions$control_signal <- rnorm(length(regions))
 #' ranked_regions <- add_signal_rank(regions)
@@ -395,18 +411,7 @@ add_signal_rank <- function(regions, negative.to.zero = TRUE, drop.no.signal = F
 #' to ameliorate the effects of outliers on the classification.
 #'
 #' @param regions A `GRanges` object containing `rank_signal` and optionally other metadata.
-#' @param transformation A function to apply to the ranking signal before threshold determination.
-#'   Default is `NULL`.
-#' @param drop.zeros Logical indicating whether to drop regions with zero signal.
-#'   Default is `FALSE`.
-#' @param thresh.method Character specifying the method to determine the signal threshold.
-#'   Must be one of "ROSE", "first", "curvature", or "arbitrary".
-#'   Default is "ROSE".
-#' @param first.threshold Numeric value for the fraction of steepest slope when using the "first" threshold method.
-#'   Higher values will result in fewer SEs called.
-#'   Default is 0.5.
-#' @param arbitrary.threshold Numeric value for the arbitrary threshold if the "arbitrary" method is selected.
-#'   Default is 0.4, which is a reasonable setting when a cumulative proportion of signal transformation is applied.
+#' @inheritParams run_rose
 #'
 #' @return A `GRanges` object with a new `super` logical column indicating whether the enhancer is classified as a super enhancer.
 #'   A `rankby_signal` column is added as the final signal values used for ranking (post-transformation, if applied).
@@ -422,9 +427,13 @@ add_signal_rank <- function(regions, negative.to.zero = TRUE, drop.no.signal = F
 #'
 #' @examples
 #' library(GenomicRanges)
-#' regions <- GRanges(seqnames = c("chr1", "chr2", "chr3"),
-#'                    ranges = IRanges(start = c(100, 200, 300),
-#'                                      end = c(200, 300, 400)))
+#' regions <- GRanges(
+#'     seqnames = c("chr1", "chr2", "chr3"),
+#'     ranges = IRanges(
+#'         start = c(100, 200, 300),
+#'         end = c(200, 300, 400)
+#'     )
+#' )
 #' regions$rank_signal <- rnorm(length(regions))
 #' classified_regions <- classify_enhancers(regions, thresh.method = "ROSE")
 classify_enhancers <- function(regions,
@@ -432,7 +441,11 @@ classify_enhancers <- function(regions,
                                drop.zeros = FALSE,
                                thresh.method = "ROSE",
                                first.threshold = 0.5,
-                               arbitrary.threshold = 0.4) {
+                               second_diff.threshold = 0,
+                               chord.threshold = 0,
+                               arbitrary.threshold = 0.4,
+                               segmented.breakpoints = 3,
+                               mads = 3) {
     if (is.null(regions$rank_signal)) {
         stop("regions must contain ranking signal, run 'add_signal_rank'")
     }
@@ -442,8 +455,8 @@ classify_enhancers <- function(regions,
         stop("transformation must be a function")
     }
 
-    if (!thresh.method %in% c("ROSE", "first", "curvature", "arbitrary")) {
-        stop("thresh.method must be one of 'ROSE', 'first', 'curvature', or 'arbitrary'")
+    if (!thresh.method %in% c("ROSE", "first", "second_diff", "curvature", "segmented", "chord", "mad", "arbitrary")) {
+        stop("thresh.method must be one of 'ROSE', 'first', 'second_diff', 'curvature', 'segmented', 'chord', 'mad', or 'arbitrary'")
     }
 
     metadata(regions)$threshold_method <- thresh.method
@@ -471,7 +484,7 @@ classify_enhancers <- function(regions,
         regions$rankby_signal <- regions$rank_signal
     }
 
-    # Use y-axis position for threshold, i.e. the signal value rather than rank
+    # Use y-axis position for threshold, i.e. the signal value rather than rank as that's what the original ROSE uses.
     if (thresh.method == "ROSE") {
         cutoff_options <- calculate_cutoff(regions$rankby_signal, drawPlot = FALSE)
         cutpoint <- cutoff_options$absolute
@@ -489,6 +502,31 @@ classify_enhancers <- function(regions,
             method = "curvature"
         )
         cutpoint <- cutpoint$y
+    } else if (thresh.method == "second_diff") {
+        cutpoint <- get_second_diff(rank(regions$rankby_signal),
+            regions$rankby_signal,
+            threshold = second_diff.threshold
+        )
+        cutpoint <- max(cutpoint$inflection_ys)
+    } else if (thresh.method == "chord") {
+        cutpoint <- get_chord_distance(rank(regions$rankby_signal),
+            regions$rankby_signal,
+            threshold = chord.threshold
+        )
+        cutpoint <- max(cutpoint$inflection_ys)
+    } else if (thresh.method == "segmented") {
+        cutpoint <- get_segmented(rank(regions$rankby_signal),
+            regions$rankby_signal,
+            segmented.breakpoints = segmented.breakpoints
+        )
+        cutpoint <- max(cutpoint$closest_ys)
+    } else if (thresh.method == "mad") {
+        cutpoint <- get_mad(rank(regions$rankby_signal),
+            regions$rankby_signal,
+            n = mads,
+            direction = "upper"
+        )
+        cutpoint <- max(cutpoint$break_ys)
     } else if (thresh.method == "arbitrary") {
         cutpoint <- arbitrary.threshold
     }
@@ -550,9 +588,10 @@ classify_enhancers <- function(regions,
 #' @param drop.no.signal Logical indicating whether to remove regions with negative or zero values in the ranking signal.
 #'   Default is `FALSE`.
 #' @param thresh.method Character string specifying the method to determine the signal threshold.
-#'   Must be one of "ROSE", "first", "second_diff", "segmented", "chord", "curvature", or "arbitrary".
+#'   Must be one of "ROSE", "first", "second_diff", "segmented", "chord", "curvature", "mad", or "arbitrary".
 #'   Default is "ROSE".
 #' @param first.threshold Numeric value for the fraction of steepest slope when using the "first" threshold method.
+#'   Higher value will result in fewer SEs called.
 #'   Default is 0.5.
 #' @param second_diff.threshold Numeric value for ignoring small differences when using the "second_diff" threshold method.
 #'   May be useful for transformation that result in curves with small differences.
@@ -567,6 +606,9 @@ classify_enhancers <- function(regions,
 #'   Default is 0.4.
 #' @param segmented.breakpoints Number of breakpoints to find when using the "segmented" threshold method.
 #'   Generally, this should be set to the rough number of linear segments in the curve.
+#'   Default is 3.
+#' @param mads Numeric value for the number of median absolute deviations to use for the "mad" threshold method.
+#'   Increasing will reduce the number of SEs called.
 #'   Default is 3.
 #' @param transformation A function to apply to the ranking signal before threshold determination.
 #'   Default is `NULL`.
@@ -631,8 +673,11 @@ run_rose <- function(
     drop.no.signal = FALSE,
     thresh.method = "ROSE",
     first.threshold = 0.5,
+    second_diff.threshold = 0,
+    chord.threshold = 0,
     arbitrary.threshold = 0.4,
     segmented.breakpoints = 3,
+    mads = 3,
     transformation = NULL,
     floor = 1,
     read.ext = 200,
@@ -644,7 +689,6 @@ run_rose <- function(
     active.genes = NULL,
     identify.active.genes = FALSE,
     omit.unknown = TRUE) {
-
     # Check that treatment is a BamFile or GRanges object
     if (!is(treatment, "BamFile") && !is(treatment, "GRanges")) {
         stop("treatment must be a BamFile or GRanges object")
@@ -661,8 +705,8 @@ run_rose <- function(
     }
 
     # Check that thresh.method is valid
-    if (!thresh.method %in% c("ROSE", "first", "second_diff", "curvature", "segmented", "chord", "arbitrary")) {
-        stop("thresh.method must be one of 'ROSE', 'first', 'second_diff', 'curvature', 'segmented', 'chord', or 'arbitrary'")
+    if (!thresh.method %in% c("ROSE", "first", "second_diff", "curvature", "segmented", "chord", "mad", "arbitrary")) {
+        stop("thresh.method must be one of 'ROSE', 'first', 'second_diff', 'curvature', 'segmented', 'chord', 'mad', or 'arbitrary'")
     }
 
     if (is(treatment, "BamFile")) {
@@ -723,7 +767,7 @@ run_rose <- function(
         message("Unstitched ", sum(hits$unstitch), " regions")
     }
 
-    message("Calculating normalized signal for ", length(peaks_stitched)," stitched regions")
+    message("Calculating normalized signal for ", length(peaks_stitched), " stitched regions")
     regions <- add_region_signal(treatment, peaks_stitched, control = control, floor = floor, read.ext = read.ext, normalize.by.width = normalize.by.width)
 
     message("Ranking regions")
@@ -731,16 +775,24 @@ run_rose <- function(
 
     message("Classifying enhancers")
     regions <- classify_enhancers(regions,
-        transformation = transformation, drop.zeros = drop.zeros,
-        thresh.method = thresh.method, first.threshold = first.threshold, arbitrary.threshold = arbitrary.threshold
+        transformation = transformation,
+        drop.zeros = drop.zeros,
+        thresh.method = thresh.method,
+        first.threshold = first.threshold,
+        second_diff.threshold = second_diff.threshold,
+        chord.threshold = chord.threshold,
+        arbitrary.threshold = arbitrary.threshold,
+        segmented.breakpoints = segmented.breakpoints
     )
 
     if (annotate) {
         if (!is.null(txdb) & !is.null(org.db)) {
             message("Annotating regions")
-            regions <- annotate_enhancers(regions, peaks, tx.db = txdb, org.db = org.db, annotate.dist = annotate.dist,
-                                        promoter.dist = promoter.dist, active.genes = active.genes,
-                                        identify.active.genes = identify.active.genes, omit.unknown = omit.unknown)
+            regions <- annotate_enhancers(regions, peaks,
+                tx.db = txdb, org.db = org.db, annotate.dist = annotate.dist,
+                promoter.dist = promoter.dist, active.genes = active.genes,
+                identify.active.genes = identify.active.genes, omit.unknown = omit.unknown
+            )
         } else {
             message("txdb and org.db must be provided for annotation, skipping")
         }

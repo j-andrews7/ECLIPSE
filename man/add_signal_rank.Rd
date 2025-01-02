@@ -27,9 +27,13 @@ optionally subtracting control signal and setting negative values to zero.
 }
 \examples{
 library(GenomicRanges)
-regions <- GRanges(seqnames = c("chr1", "chr2", "chr3"),
-                   ranges = IRanges(start = c(100, 200, 300),
-                   end = c(200, 300, 400)))
+regions <- GRanges(
+    seqnames = c("chr1", "chr2", "chr3"),
+    ranges = IRanges(
+        start = c(100, 200, 300),
+        end = c(200, 300, 400)
+    )
+)
 regions$sample_signal <- rnorm(length(regions))
 regions$control_signal <- rnorm(length(regions))
 ranked_regions <- add_signal_rank(regions)
