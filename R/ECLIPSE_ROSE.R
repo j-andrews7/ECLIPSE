@@ -517,7 +517,7 @@ classify_enhancers <- function(regions,
     } else if (thresh.method == "segmented") {
         cutpoint <- get_segmented(rank(regions$rankby_signal),
             regions$rankby_signal,
-            segmented.breakpoints = segmented.breakpoints
+            n.breakpoints = segmented.breakpoints
         )
         cutpoint <- max(cutpoint$closest_ys)
     } else if (thresh.method == "mad") {
