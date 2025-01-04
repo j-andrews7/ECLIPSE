@@ -440,6 +440,7 @@ classify_enhancers <- function(regions,
                                transformation = NULL,
                                drop.zeros = FALSE,
                                thresh.method = "ROSE",
+                               rose.slope = NULL,
                                first.threshold = 0.5,
                                second_diff.threshold = 0,
                                chord.threshold = 0,
@@ -486,7 +487,7 @@ classify_enhancers <- function(regions,
 
     # Use y-axis position for threshold, i.e. the signal value rather than rank as that's what the original ROSE uses.
     if (thresh.method == "ROSE") {
-        cutoff_options <- calculate_cutoff(regions$rankby_signal, drawPlot = FALSE)
+        cutoff_options <- calculate_cutoff(regions$rankby_signal, drawPlot = FALSE, slope = rose.slope)
         cutpoint <- cutoff_options$absolute
     } else if (thresh.method == "first") {
         cutpoint <- findCutoff(
@@ -590,6 +591,9 @@ classify_enhancers <- function(regions,
 #' @param thresh.method Character string specifying the method to determine the signal threshold.
 #'   Must be one of "ROSE", "first", "second_diff", "segmented", "chord", "curvature", "mad", or "arbitrary".
 #'   Default is "ROSE".
+#' @param rose.slope Numeric value for the slope of the diagonal line used for the "ROSE" threshold method.
+#'  Default is `NULL`, meaning it will be calculated automatically based on the minimum and maximum signal values. 
+#' See `calculate_cutoff` for details.
 #' @param first.threshold Numeric value for the fraction of steepest slope when using the "first" threshold method.
 #'   Higher value will result in fewer SEs called.
 #'   Default is 0.5.
@@ -672,6 +676,7 @@ run_rose <- function(
     negative.to.zero = TRUE,
     drop.no.signal = FALSE,
     thresh.method = "ROSE",
+    rose.slope = NULL,
     first.threshold = 0.5,
     second_diff.threshold = 0,
     chord.threshold = 0,
@@ -778,6 +783,7 @@ run_rose <- function(
         transformation = transformation,
         drop.zeros = drop.zeros,
         thresh.method = thresh.method,
+        rose.slope = rose.slope,
         first.threshold = first.threshold,
         second_diff.threshold = second_diff.threshold,
         chord.threshold = chord.threshold,

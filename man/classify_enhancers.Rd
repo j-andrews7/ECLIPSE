@@ -9,6 +9,7 @@ classify_enhancers(
   transformation = NULL,
   drop.zeros = FALSE,
   thresh.method = "ROSE",
+  rose.slope = NULL,
   first.threshold = 0.5,
   second_diff.threshold = 0,
   chord.threshold = 0,
@@ -29,6 +30,10 @@ Default is \code{FALSE}.}
 \item{thresh.method}{Character string specifying the method to determine the signal threshold.
 Must be one of "ROSE", "first", "second_diff", "segmented", "chord", "curvature", "mad", or "arbitrary".
 Default is "ROSE".}
+
+\item{rose.slope}{Numeric value for the slope of the diagonal line used for the "ROSE" threshold method.
+Default is \code{NULL}, meaning it will be calculated automatically based on the minimum and maximum signal values.
+See \code{calculate_cutoff} for details.}
 
 \item{first.threshold}{Numeric value for the fraction of steepest slope when using the "first" threshold method.
 Higher value will result in fewer SEs called.
