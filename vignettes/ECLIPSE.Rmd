@@ -137,9 +137,15 @@ We have closely examined and tested the ROSE source code and have made the follo
    - The "signal" is then calculated from the "mapped GFF" files for the stitched regions by multiplying the library size-normalized factor by the width of the region. Ultimately, this just results in the library size-normalized sum of coverage for a region, independent of its size (ADD EXAMPLE TO DEMONSTRATE THIS.)
      - This biases ROSE towards large regions, potentially ignoring smaller regions that have a higher signal density that may still have an outsized regulatory impact. This is worth exploring further.
    - ECLIPSE provides an option (`normalize.by.width`) to scale the final signal by the region width. 
-     In the future, we will add ways to include only the width of reasonable signal regions (either by using the sum of constituent elements widths or bases with some reasonable level of signal) in this calculation.
+     - In the future, we will add ways to include only the width of reasonable signal regions (either by using the sum of constituent elements widths or bases with some reasonable level of signal) in this calculation.
  2. ROSE has a bug in the unstitching process whereby it rarely does not unstitch regions that clearly span TSSes from 3 or more unique genes.
-   What exactly the bug is remains unclear, but it may be related to how ROSE is performing overlaps.
+   - What exactly the bug is remains unclear, but it may be related to how ROSE is performing overlaps.
+   - ECLIPSE does not have this issue, which alters the final number of regions returned (and thus SEs called) to a minor degree.
+ 3. Outliers have an outsized impact on the signal ranking and final classifications in ROSE.
+   - To elaborate, if you remove the top 5 or 10 regions by signal, the ranking of the remaining regions changes dramatically and the threshold for super-enhancer classification is much different. This results in non-robust classifications whereby you can easily get 100s more/less SEs from sample to sample of the exact same tissue or cell type just depending on how dramatic the outliers are.
+   - We *highly* recommend using the transformation capabilities included in ECLIPSE to monotonically transform the signal prior to ranking, which will dramatically reduce the impact of outliers on the final classification while maintaining the same rank. See the `transformation`, `thresh.method`, `first.threshold`, and `arbitrary.threshold` parameters in `?run_rose` for options and additional information.
+   
+This list is incomplete and will be updated as we continue to explore the differences between ECLIPSE and ROSE.
 
 ## Running with TSS Exclusion
 

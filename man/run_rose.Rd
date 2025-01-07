@@ -18,13 +18,18 @@ run_rose(
   negative.to.zero = TRUE,
   drop.no.signal = FALSE,
   thresh.method = "ROSE",
+  rose.slope = NULL,
+  first.threshold = 0.5,
+  second_diff.threshold = 0,
+  chord.threshold = 0,
+  arbitrary.threshold = 0.4,
+  segmented.breakpoints = 3,
+  mads = 3,
   transformation = NULL,
   floor = 1,
   read.ext = 200,
   normalize.by.width = FALSE,
   drop.zeros = FALSE,
-  first.threshold = 0.5,
-  arbitrary.threshold = 0.4,
   annotate = TRUE,
   annotate.dist = 50000,
   promoter.dist = c(2000, 200),
@@ -71,8 +76,38 @@ Default is \code{TRUE}.}
 Default is \code{FALSE}.}
 
 \item{thresh.method}{Character string specifying the method to determine the signal threshold.
-Must be one of "ROSE", "first", "curvature", or "arbitrary".
+Must be one of "ROSE", "first", "second_diff", "segmented", "chord", "curvature", "mad", or "arbitrary".
 Default is "ROSE".}
+
+\item{rose.slope}{Numeric value for the slope of the diagonal line used for the "ROSE" threshold method.
+Default is \code{NULL}, meaning it will be calculated automatically based on the minimum and maximum signal values.
+See \code{calculate_cutoff} for details.}
+
+\item{first.threshold}{Numeric value for the fraction of steepest slope when using the "first" threshold method.
+Higher value will result in fewer SEs called.
+Default is 0.5.}
+
+\item{second_diff.threshold}{Numeric value for ignoring small differences when using the "second_diff" threshold method.
+May be useful for transformation that result in curves with small differences.
+Generally, unlikely to be useful for most applications.
+Default is 0.}
+
+\item{chord.threshold}{Numeric value for ignoring small differences when using the "chord" threshold method.
+May be useful for transformation that result in curves with small differences.
+Generally, unlikely to be useful for most applications.
+Default is 0.}
+
+\item{arbitrary.threshold}{Numeric value for the arbitrary threshold if the "arbitrary" threshold method is selected.
+Useful for scaled transformations like cumulative proportion of signal.
+Default is 0.4.}
+
+\item{segmented.breakpoints}{Number of breakpoints to find when using the "segmented" threshold method.
+Generally, this should be set to the rough number of linear segments in the curve.
+Default is 3.}
+
+\item{mads}{Numeric value for the number of median absolute deviations to use for the "mad" threshold method.
+Increasing will reduce the number of SEs called.
+Default is 3.}
 
 \item{transformation}{A function to apply to the ranking signal before threshold determination.
 Default is \code{NULL}.}
@@ -89,16 +124,11 @@ ROSE does this, but then undoes it at a later step, so \code{FALSE} is the defau
 \item{drop.zeros}{Logical indicating whether to drop regions with zero signal.
 Default is \code{FALSE}.}
 
-\item{first.threshold}{Numeric value for the fraction of steepest slope when using the "first" threshold method.
-Default is 0.5.}
-
-\item{arbitrary.threshold}{Numeric value for the arbitrary threshold if the "arbitrary" method is selected.
-Default is 0.4.}
-
 \item{annotate}{Logical indicating whether annotations should be provided.
 Default is \code{TRUE}.}
 
-\item{annotate.dist}{Numeric specifying the flanking distance (in bp) around the region to annotate.
+\item{annotate.dist}{Numeric specifying the flanking distance (in bp) around the region to use
+for annotation, i.e. genes within this distance will be associated with the region.
 Default is 50000.}
 
 \item{promoter.dist}{Integer vector of length 2, where first and second values are upstream/downstream
@@ -107,10 +137,11 @@ and determining active genes.
 Default is \code{c(2000, 200)}.}
 
 \item{active.genes}{Character vector of gene \emph{symbols} to retain in the annotations.
+Can be useful for retaining only expressed genes.
 Default is \code{NULL}.}
 
 \item{identify.active.genes}{Logical indicating whether active genes should be identified based on
-overlaps with \code{peaks}. Cannot be used simultaneously with \code{active.genes}.
+overlaps with \code{peaks}. Will be ignored if \code{active.genes} provided.
 Default is \code{FALSE}.}
 
 \item{omit.unknown}{Logical indicating whether uncharacterized genes (i.e., gene symbols starting with \emph{LOC})
@@ -118,7 +149,8 @@ should be excluded from annotations.
 Default is \code{TRUE}.}
 }
 \value{
-A \code{GRanges} object containing the classified super-enhancers and associated metadata.
+A \code{GRanges} object containing the classified regions and associated metadata of each,
+including super enhancer status.
 }
 \description{
 This function performs the ROSE for identifying super-enhancers by stitching

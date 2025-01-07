@@ -12,11 +12,11 @@ Authors@R: c(
     comment = "Author of included original ROSE thresholding code."))
 Description: ECLIPSE provides a performant implementation of the rank ordering of super enhancers (ROSE) method for identifying super enhancers.
     It provides options to increase the robustness of ROSE via signal transformations prior to thresholding and additional thresholding approaches.
-    It also increases flexibility by exposing parameters hidden in the original implementation.
-    ECLIPSE additionally contains novel functionality to identify sub-structural changes within enhancer regions between groups via sliding window and binning approaches.
-    It also contains visualization functions to generate high-quality plots of specific loci alongside arbitrary user-provided data.
-URL: https://github.com/stjude-biohackathon/ECLIPSE
-BugReports: https://github.com/stjude-biohackathon/ECLIPSE/issues
+    It increases flexibility and provides additional control by exposing parameters hidden in the original implementation.
+    ECLIPSE also contains novel functionality to identify sub-structural changes within enhancer regions between groups via sliding window and binning approaches.
+    ECLIPSE allows generation of high-quality plots of specific loci alongside arbitrary user-provided data.
+URL: https://github.com/j-andrews7/ECLIPSE
+BugReports: https://github.com/j-andrews7/ECLIPSE/issues
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
@@ -47,7 +47,8 @@ Suggests:
     TxDb.Hsapiens.UCSC.hg38.knownGene,
     org.Hs.eg.db,
     DESeq2,
-    apeglm
+    apeglm,
+    segmented
 Depends:
     R (>= 4.4.0)
 biocViews: 

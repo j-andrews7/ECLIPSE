@@ -41,10 +41,12 @@
 #' @keywords internal
 #'
 #' @rdname INTERNAL_calculate_cutoff
-calculate_cutoff <- function(inputVector, drawPlot = TRUE, ...) {
+calculate_cutoff <- function(inputVector, drawPlot = TRUE, slope = NULL, ...) {
     inputVector <- sort(inputVector)
     inputVector[inputVector < 0] <- 0 # Set negative values to zero
-    slope <- (max(inputVector) - min(inputVector)) / length(inputVector)
+    if (is.null(slope)) {
+        slope <- (max(inputVector) - min(inputVector)) / length(inputVector)
+    }
     xPt <- floor(optimize(numPts_below_line,
         lower = 1, upper = length(inputVector),
         myVector = inputVector, slope = slope

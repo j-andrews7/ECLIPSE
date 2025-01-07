@@ -9,8 +9,13 @@ classify_enhancers(
   transformation = NULL,
   drop.zeros = FALSE,
   thresh.method = "ROSE",
+  rose.slope = NULL,
   first.threshold = 0.5,
-  arbitrary.threshold = 0.4
+  second_diff.threshold = 0,
+  chord.threshold = 0,
+  arbitrary.threshold = 0.4,
+  segmented.breakpoints = 3,
+  mads = 3
 )
 }
 \arguments{
@@ -22,16 +27,39 @@ Default is \code{NULL}.}
 \item{drop.zeros}{Logical indicating whether to drop regions with zero signal.
 Default is \code{FALSE}.}
 
-\item{thresh.method}{Character specifying the method to determine the signal threshold.
-Must be one of "ROSE", "first", "curvature", or "arbitrary".
+\item{thresh.method}{Character string specifying the method to determine the signal threshold.
+Must be one of "ROSE", "first", "second_diff", "segmented", "chord", "curvature", "mad", or "arbitrary".
 Default is "ROSE".}
 
+\item{rose.slope}{Numeric value for the slope of the diagonal line used for the "ROSE" threshold method.
+Default is \code{NULL}, meaning it will be calculated automatically based on the minimum and maximum signal values.
+See \code{calculate_cutoff} for details.}
+
 \item{first.threshold}{Numeric value for the fraction of steepest slope when using the "first" threshold method.
-Higher values will result in fewer SEs called.
+Higher value will result in fewer SEs called.
 Default is 0.5.}
 
-\item{arbitrary.threshold}{Numeric value for the arbitrary threshold if the "arbitrary" method is selected.
-Default is 0.4, which is a reasonable setting when a cumulative proportion of signal transformation is applied.}
+\item{second_diff.threshold}{Numeric value for ignoring small differences when using the "second_diff" threshold method.
+May be useful for transformation that result in curves with small differences.
+Generally, unlikely to be useful for most applications.
+Default is 0.}
+
+\item{chord.threshold}{Numeric value for ignoring small differences when using the "chord" threshold method.
+May be useful for transformation that result in curves with small differences.
+Generally, unlikely to be useful for most applications.
+Default is 0.}
+
+\item{arbitrary.threshold}{Numeric value for the arbitrary threshold if the "arbitrary" threshold method is selected.
+Useful for scaled transformations like cumulative proportion of signal.
+Default is 0.4.}
+
+\item{segmented.breakpoints}{Number of breakpoints to find when using the "segmented" threshold method.
+Generally, this should be set to the rough number of linear segments in the curve.
+Default is 3.}
+
+\item{mads}{Numeric value for the number of median absolute deviations to use for the "mad" threshold method.
+Increasing will reduce the number of SEs called.
+Default is 3.}
 }
 \value{
 A \code{GRanges} object with a new \code{super} logical column indicating whether the enhancer is classified as a super enhancer.
@@ -47,9 +75,13 @@ to ameliorate the effects of outliers on the classification.
 }
 \examples{
 library(GenomicRanges)
-regions <- GRanges(seqnames = c("chr1", "chr2", "chr3"),
-                   ranges = IRanges(start = c(100, 200, 300),
-                                     end = c(200, 300, 400)))
+regions <- GRanges(
+    seqnames = c("chr1", "chr2", "chr3"),
+    ranges = IRanges(
+        start = c(100, 200, 300),
+        end = c(200, 300, 400)
+    )
+)
 regions$rank_signal <- rnorm(length(regions))
 classified_regions <- classify_enhancers(regions, thresh.method = "ROSE")
 }
