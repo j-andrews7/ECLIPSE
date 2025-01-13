@@ -84,7 +84,14 @@ peaks <- readBed(peaks_path)
 
 naiveB1_enhancers <- run_rose(treatment = treat_bam, control = control_bam, peaks = peaks,
                               txdb = txdb, org.db = org.db, stitch.distance = 12500, tss.exclusion.distance = 2500,
-                              max.unique.gene.tss.overlap = 2)
+                              max.unique.gene.tss.overlap = 2,
+                              drop.no.signal = TRUE)
+
+naiveB1_enhancers_width_normalized <- run_rose(treatment = treat_bam, control = control_bam, peaks = peaks,
+                              txdb = txdb, org.db = org.db, stitch.distance = 12500, tss.exclusion.distance = 2500,
+                              max.unique.gene.tss.overlap = 2,
+                              drop.no.signal = TRUE,
+                              normalize.by.width = TRUE)
 
 naiveB1_enhancers
 ```
@@ -130,7 +137,8 @@ We have closely examined and tested the ROSE source code and have made the follo
  1. ROSE does not use region size scaling for final signal ranking in a meaningful way. The signals in ROSE are derived as follows:
    - All reads overlapping a given region are pulled.
    - These reads are extended by 200 bp.
-   - The coverage for each base in the region is counted (via samtools view, which is very slow when done on each individual region).
+   - The coverage for each base in the region is counted (via samtools view, which is very slow when done on each individual region). 
+     - There are alternative implementations floating around Github that use a tool called bamliquidator that is much faster, but it's also difficult to install and poorly supported.
    - The coverage for the region is summed and divided by the region width to generate a density factor.
    - The density factor is then divided by the MMR factor (mapped reads/1000000) to generate a library size-normalized signal factor.
    - This factor is saved for each stitched region into the "mapped GFF" files.
@@ -227,7 +235,275 @@ naiveB1_enhancers_bigwig <- run_rose(treatment = naiveB1_bw, peaks = peaks,
                               max.unique.gene.tss.overlap = 2, floor = 0, normalize.by.width = TRUE)
 ```
 
+## Exploring Transformations & Thresholding Methods
 
+As mentioned above, ROSE is highly sensitive to outliers in the signal, which can dramatically alter the final classification of regions.
+ECLIPSE provides a parameter for applying a transformation function to all regions prior to ranking to reduce the impact of outliers on the final classification.
+
+However, it is unclear which transformation(s) are most appropriate for this task.
+These transformations may also change the shape of the curve, which may necessitate a change in the thresholding method used.
+
+### Transformations
+
+As it stands, the original ROSE implementation uses an arbitrary thresholding approach.
+It'd be nice to use a more statistically rigorous approach based on the distribution of the (potentially width-normalized) signal for each region.
+
+It'd be convenient if we could get a relatively normal distribution of signal values for each region, which would allow us to use a Z-score or similar approach to thresholding.
+
+As such, let's test a few transformations, make some histograms/qqplots, and see what looks best.
+We will also do this for width-normalized signal to see how that looks.
+
+```{r}
+logistic_transform_scaled_robust <- function(x) {
+  center <- median(x, na.rm = TRUE)
+  spread <- IQR(x, na.rm = TRUE) # interquartile range
+  if (spread == 0) spread <- 1   # fallback if IQR=0
+  
+  1 / (1 + exp(-(x - center) / spread))
+}
+
+probit_transform_scaled_robust <- function(x) {
+  center <- median(x, na.rm = TRUE)
+  spread <- IQR(x, na.rm = TRUE)
+  if (spread == 0) spread <- 1
+  
+  pnorm((x - center) / spread)
+}
+
+
+# --------------------------------------------------
+# 2) Winsorized Min–Max Scaling
+# --------------------------------------------------
+#   - Caps extreme values at chosen quantiles
+#   - Then applies linear min–max scaling
+#   - Maps data into [0, 1]
+
+winsorized_minmax_scale <- function(x, upper_quantile = 0.999, lower_quantile = 0.01) {
+  # 1) Identify cutoffs
+  q_high <- quantile(x, probs = upper_quantile, na.rm = TRUE)
+  q_low  <- quantile(x, probs = lower_quantile, na.rm = TRUE)
+  
+  # 2) Winsorize
+  x_winsor <- pmax(pmin(x, q_high), q_low)
+  
+  # 3) Min–Max scaling
+  x_min <- min(x_winsor, na.rm = TRUE)
+  x_max <- max(x_winsor, na.rm = TRUE)
+  
+  (x_winsor - x_min) / (x_max - x_min)
+}
+
+
+# --------------------------------------------------
+# 3) Rank-Inverse Normal Transform (RINT)
+# --------------------------------------------------
+#   - Rank the data -> convert rank to percentile -> map via inverse normal
+#   - Often used to create data with near-Gaussian distribution
+
+rint_transform <- function(x) {
+  # 1) Get rank-based percentile
+  r <- rank(x, ties.method = "average", na.last = "keep")
+  n <- sum(!is.na(x))
+  # Convert rank to a fraction in (0,1). 
+  # Add a small offset to avoid exactly 0 or 1.
+  p <- (r - 0.5) / n
+  
+  # 2) Map percentiles via inverse normal (qnorm)
+  qnorm(p)
+}
+
+
+# --------------------------------------------------
+# 4) Combination: Log + Min–Max
+# --------------------------------------------------
+#   - First apply a log-like transform (log or log1p) 
+#   - Then map results into [0,1] with min–max scaling
+#   - Uses pseudocount to avoid 0/negative values
+
+log_minmax_transform <- function(x) {
+  # 1) Log transform
+  x_log <- log1p(x) # or simply log(x_shifted)
+  
+  # 2) Min–Max scale
+  x_min <- min(x_log, na.rm = TRUE)
+  x_max <- max(x_log, na.rm = TRUE)
+  (x_log - x_min) / (x_max - x_min)
+}
+
+
+# --------------------------------------------------
+# 5) Combination: asinh + Min–Max
+# --------------------------------------------------
+#   - arcsinh is a 'soft log' that can handle negative values
+#   - Then do min–max scaling
+#   - Very useful when data can be negative and large positive
+
+asinh_minmax_transform <- function(x, scale_param = 1) {
+  # 1) 'soft log' transform
+  x_asinh <- asinh(scale_param * x)
+  
+  # 2) Min–Max scale
+  x_min <- min(x_asinh, na.rm = TRUE)
+  x_max <- max(x_asinh, na.rm = TRUE)
+  
+  (x_asinh - x_min) / (x_max - x_min)
+}
+
+
+# --------------------------------------------------
+# Other basic transforms
+# --------------------------------------------------
+
+## Power transform: x^alpha
+power_transform <- function(x, alpha = 0.2) {
+  x^alpha
+}
+
+# Normalize to between [0, 1] and then cube to create more separation at high values 
+scale_cube_transform <- function(x) { 
+    x <- x
+    mmax <- max(x)
+    mmin <- min(x)
+    x <- (x-mmin)/pmax(mmax-mmin, 1e-8)
+    x <- x^3
+    x
+}
+
+# Cumulative proportion of signal for each element
+cumal_prop_transform <- function(x) {
+    x <- x/sum(x)
+    x <- cumsum(x)
+    x <- 1 - x # Reverse so that the highest values are at the top
+    x
+}
+
+# Cumulative proportion of signal for each element
+cumal_prop_log2_transform <- function(x) {
+    x <- log2(x)
+    x <- x/sum(x)
+    x <- cumsum(x)
+    x <- 1 - x # Reverse so that the highest values are at the top
+    x
+}
+
+## sqrt transform
+sqrt_transform <- function(x) {
+  sqrt(x)
+}
+
+## cuberoot transform
+cuberoot_transform <- function(x) {
+  x^(1/3)
+}
+
+## Box-Cox: (x^lambda - 1) / lambda, with log fallback
+boxcox_transform <- function(x, lambda = 0.2) {
+  if (lambda == 0) {
+    log(x)
+  } else {
+    (x^lambda - 1) / lambda
+  }
+}
+
+## Robust z-score transform: (x - median) / MAD
+robust_z_transform <- function(x) {
+  (x - median(x, na.rm = TRUE)) / mad(x, na.rm = TRUE)
+}
+
+## And with log2 transformation first
+robust_log2_z_transform <- function(x) {
+  (log2(x) - median(log2(x), na.rm = TRUE)) / mad(log2(x), na.rm = TRUE)
+}
+
+## log1p transform: log(1 + x)
+log1p_transform <- function(x) {
+  log1p(x)
+}
+
+## arcsinh transform
+asinh_transform <- function(x) {
+  asinh(x)
+}
+
+## arcsinh with scaling
+asinh_transform_scaled <- function(x) {
+    scale <- IQR(x, na.rm = TRUE) # interquartile range
+    asinh(scale * x) / scale
+}
+
+## Classic min–max (no winsorizing)
+minmax_scale <- function(x) {
+  (x - min(x)) / (max(x) - min(x))
+}
+
+## Logistic transform (simple)
+logistic_transform <- function(x) {
+  1 / (1 + exp(-x))
+}
+
+winsorize_transform <- function(x, upper_quantile = 0.999, lower_quantile = 0.01) {
+  # 1) Identify cutoffs
+  q_high <- quantile(x, probs = upper_quantile, na.rm = TRUE)
+  q_low  <- quantile(x, probs = lower_quantile, na.rm = TRUE)
+  
+  # 2) Winsorize
+  pmax(pmin(x, q_high), q_low)
+}
+```
+
+Now for each transformation function, we'll apply it to the signal to the signal column and plot the histograms and qqplots.
+
+```{r}
+sig <- naiveB1_enhancers$rankby_signal
+sig_width_norm <- naiveB1_enhancers_width_normalized$rankby_signal
+
+# Named list of transformations, underscore delimiter
+transformations <- list(
+  logistic_transform_scaled_robust = logistic_transform_scaled_robust,
+  probit_transform_scaled_robust = probit_transform_scaled_robust,
+  winsorized_minmax_scale = winsorized_minmax_scale,
+  rint_transform = rint_transform,
+  log_minmax_transform = log_minmax_transform,
+  asinh_minmax_transform = asinh_minmax_transform,
+  power_transform = power_transform,
+  scale_cube_transform = scale_cube_transform,
+  cumal_prop_transform = cumal_prop_transform,
+  cumal_prop_log2_transform = cumal_prop_log2_transform,
+  sqrt_transform = sqrt_transform,
+  cuberoot_transform = cuberoot_transform,
+  boxcox_transform = boxcox_transform,
+  robust_z_transform = robust_z_transform,
+  #robust_log2_z_transform = robust_log2_z_transform,
+  log1p_transform = log1p_transform,
+  asinh_transform = asinh_transform,
+  asinh_transform_scaled = asinh_transform_scaled,
+  minmax_scale = minmax_scale,
+  logistic_transform = logistic_transform,
+  winsorize_transform = winsorize_transform
+)
+
+transformed_sigs <- lapply(transformations, function(f) f(sig))
+
+# Plot histograms and qqplots in PDF with new page for each transformation, both plots on one page
+pdf("transformed_signal_distributions.NaiveB1.pdf", width = 10, height = 6)
+par(mfrow = c(1, 2))
+for (i in seq_along(transformed_sigs)) {
+  hist(transformed_sigs[[i]], main = names(transformations)[[i]], xlab = "Transformed Signal", breaks = 50)
+  qqnorm(transformed_sigs[[i]], main = names(transformations)[[i]])
+}
+dev.off()
+
+transformed_sigs_width_norm <- lapply(transformations, function(f) f(sig_width_norm))
+
+# Plot histograms and qqplots in PDF with new page for each transformation, both plots on one page
+pdf("transformed_signal_distributions.NaiveB1.width_norm.pdf", width = 10, height = 6)
+par(mfrow = c(1, 2))
+for (i in seq_along(transformed_sigs_width_norm)) {
+  hist(transformed_sigs_width_norm[[i]], main = names(transformations)[[i]], xlab = "Transformed Signal", breaks = 50)
+  qqnorm(transformed_sigs_width_norm[[i]], main = names(transformations)[[i]])
+}
+dev.off()
+```
 
 ## Differential Sub-Structural Analysis
 

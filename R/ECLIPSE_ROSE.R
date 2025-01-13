@@ -313,6 +313,10 @@ add_region_signal <- function(treatment,
 
             ctrl_cov$signal <- ctrl_cov$coverage / ctrl_mmr
 
+            if (normalize.by.width) {
+                ctrl_cov$signal <- ctrl_cov$signal / width(ctrl_cov)
+            }
+
             regions$control_signal <- ctrl_cov$signal
             metadata(regions)$control_mmr <- ctrl_mmr
         } else {
@@ -416,7 +420,7 @@ add_signal_rank <- function(regions, negative.to.zero = TRUE, drop.no.signal = F
 #' @return A `GRanges` object with a new `super` logical column indicating whether the enhancer is classified as a super enhancer.
 #'   A `rankby_signal` column is added as the final signal values used for ranking (post-transformation, if applied).
 #'   Any transformations applied, the thresholding method used, the threshold, and the number of dropped regions if
-#'   `drop.zeros = TRUE` are added to the metadata of the `GRanges` object.
+#'   `drop.no.signal = TRUE` are added to the metadata of the `GRanges` object.
 #'
 #' @export
 #'
@@ -438,7 +442,6 @@ add_signal_rank <- function(regions, negative.to.zero = TRUE, drop.no.signal = F
 #' classified_regions <- classify_enhancers(regions, thresh.method = "ROSE")
 classify_enhancers <- function(regions,
                                transformation = NULL,
-                               drop.zeros = FALSE,
                                thresh.method = "ROSE",
                                rose.slope = NULL,
                                first.threshold = 0.5,
@@ -461,14 +464,6 @@ classify_enhancers <- function(regions,
     }
 
     metadata(regions)$threshold_method <- thresh.method
-
-    if (drop.zeros) {
-        num_no_sig_regions <- NROW(regions[regions$rank_signal == 0])
-        message(paste("Dropped", num_no_sig_regions, "regions due to no signal"))
-        metadata(regions)$dropped_zero_count <- num_no_sig_regions
-        regions <- regions[regions$rank_signal > 0]
-        regions$region_rank <- seq_len(NROW(regions))
-    }
 
     # Keep track of whether to use transformed signal.
     use_transformed <- FALSE
@@ -588,6 +583,7 @@ classify_enhancers <- function(regions,
 #'   Default is `TRUE`.
 #' @param drop.no.signal Logical indicating whether to remove regions with negative or zero values in the ranking signal.
 #'   Default is `FALSE`.
+#'   This is done prior to any transformation.
 #' @param thresh.method Character string specifying the method to determine the signal threshold.
 #'   Must be one of "ROSE", "first", "second_diff", "segmented", "chord", "curvature", "mad", or "arbitrary".
 #'   Default is "ROSE".
@@ -622,8 +618,6 @@ classify_enhancers <- function(regions,
 #'   Default is 200. Ignored if inputs are `GRanges` objects.
 #' @param normalize.by.width Logical indicating whether to normalize signal by region width.
 #'   ROSE does this, but then undoes it at a later step, so `FALSE` is the default.
-#' @param drop.zeros Logical indicating whether to drop regions with zero signal.
-#'   Default is `FALSE`.
 #' @param annotate Logical indicating whether annotations should be provided.
 #'   Default is `TRUE`.
 #' @param annotate.dist Numeric specifying the flanking distance (in bp) around the region to use
@@ -687,7 +681,6 @@ run_rose <- function(
     floor = 1,
     read.ext = 200,
     normalize.by.width = FALSE,
-    drop.zeros = FALSE,
     annotate = TRUE,
     annotate.dist = 50000,
     promoter.dist = c(2000, 200),
@@ -781,7 +774,6 @@ run_rose <- function(
     message("Classifying enhancers")
     regions <- classify_enhancers(regions,
         transformation = transformation,
-        drop.zeros = drop.zeros,
         thresh.method = thresh.method,
         rose.slope = rose.slope,
         first.threshold = first.threshold,

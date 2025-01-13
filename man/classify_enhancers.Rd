@@ -7,7 +7,6 @@
 classify_enhancers(
   regions,
   transformation = NULL,
-  drop.zeros = FALSE,
   thresh.method = "ROSE",
   rose.slope = NULL,
   first.threshold = 0.5,
@@ -23,9 +22,6 @@ classify_enhancers(
 
 \item{transformation}{A function to apply to the ranking signal before threshold determination.
 Default is \code{NULL}.}
-
-\item{drop.zeros}{Logical indicating whether to drop regions with zero signal.
-Default is \code{FALSE}.}
 
 \item{thresh.method}{Character string specifying the method to determine the signal threshold.
 Must be one of "ROSE", "first", "second_diff", "segmented", "chord", "curvature", "mad", or "arbitrary".
@@ -65,7 +61,7 @@ Default is 3.}
 A \code{GRanges} object with a new \code{super} logical column indicating whether the enhancer is classified as a super enhancer.
 A \code{rankby_signal} column is added as the final signal values used for ranking (post-transformation, if applied).
 Any transformations applied, the thresholding method used, the threshold, and the number of dropped regions if
-\code{drop.zeros = TRUE} are added to the metadata of the \code{GRanges} object.
+\code{drop.no.signal = TRUE} are added to the metadata of the \code{GRanges} object.
 }
 \description{
 Classifies enhancers as super enhancers or typical enhancers based on a ranking signal and
