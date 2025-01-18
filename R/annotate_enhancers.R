@@ -86,8 +86,7 @@ annotate_enhancers <- function(regions, peaks, tx.db, org.db, annotate.dist = 50
         message("Identifying active genes")
 
         # Retrieve promoters
-        promoters <- suppressWarnings(promoters(TxDb, upstream = promoter.dist[1], downstream = promoter.dist[2])) # suppress out-of-bounds warning
-        promoters <- trim(promoters) # trim out of bounds ranges
+        promoters <- promoters(TxDb, upstream = promoter.dist[1], downstream = promoter.dist[2])
 
         # Identify active promoters by checking overlaps with peaks
         overlaps <- findOverlaps(query = peaks, subject = promoters)
