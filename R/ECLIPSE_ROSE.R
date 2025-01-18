@@ -188,8 +188,9 @@ unstitch_regions <- function(stitched, original, tss, id.col = "GENEID", thresho
 #'   Coverage must be greater than this value to be counted in the signal.
 #'   Default is 1.
 #' @param read.ext Numeric value for extending reads downstream. Default is 200.
-#' @param normalize.by.width Logical indicating whether to normalize signal by region width.
-#'   `FALSE` by default, as ROSE does this, but then it undoes it in a later step, so what's the point?
+#' @param normalize.by.width Logical indicating whether to normalize signal by total width of constituent elements.
+#'   `FALSE` by default, as ROSE does this based on total region width rather than constituent elements, 
+#'   but then it undoes it in a later step, so what's the point?
 #'
 #' @return A GRanges object for `regions` with additional columns for sample and control (if provided) signal.
 #'   The metadata of the object will also contain the scaling factor for library size normalization for the `treatment`
@@ -201,7 +202,6 @@ unstitch_regions <- function(stitched, original, tss, id.col = "GENEID", thresho
 #' @importFrom rtracklayer import
 #' @importFrom S4Vectors 'metadata<-'
 #' @importFrom GenomicRanges granges trim coverage
-#' @importFrom HelloRanges do_bedtools_coverage
 #' @importFrom IRanges IRanges
 #'
 #' @author Jared Andrews
@@ -262,8 +262,6 @@ add_region_signal <- function(treatment,
             samp_reads <- extend_reads(samp_reads, downstream = read.ext)
         }
 
-        # samp_cov <- do_bedtools_coverage(a = regions, b = samp_reads, d = TRUE)
-
         cov <- unname(coverage(samp_reads)[regions])
         samp_cov <- regions
         mcols(samp_cov)$coverage <- cov
@@ -274,7 +272,7 @@ add_region_signal <- function(treatment,
         samp_cov$signal <- samp_cov$coverage / samp_mmr
 
         if (normalize.by.width) {
-            samp_cov$signal <- samp_cov$signal / width(samp_cov)
+            samp_cov$signal <- samp_cov$signal / samp_cov$total_constituent_width
         }
 
         regions$sample_signal <- samp_cov$signal
@@ -288,7 +286,7 @@ add_region_signal <- function(treatment,
         samp_cov$signal <- sum(samp_cov$coverage)
 
         if (normalize.by.width) {
-            samp_cov$signal <- samp_cov$signal / width(samp_cov)
+            samp_cov$signal <- samp_cov$signal / samp_cov$total_constituent_width
         }
 
         regions$sample_signal <- samp_cov$signal
@@ -306,7 +304,9 @@ add_region_signal <- function(treatment,
                 ctrl_reads <- extend_reads(ctrl_reads, downstream = read.ext)
             }
 
-            ctrl_cov <- do_bedtools_coverage(a = regions, b = ctrl_reads, d = TRUE)
+            cov <- unname(coverage(ctrl_reads)[regions])
+            ctrl_cov <- regions
+            mcols(ctrl_cov)$coverage <- cov
 
             ctrl_cov$coverage <- ctrl_cov$coverage[ctrl_cov$coverage > floor]
             ctrl_cov$coverage <- sum(ctrl_cov$coverage)
@@ -314,7 +314,7 @@ add_region_signal <- function(treatment,
             ctrl_cov$signal <- ctrl_cov$coverage / ctrl_mmr
 
             if (normalize.by.width) {
-                ctrl_cov$signal <- ctrl_cov$signal / width(ctrl_cov)
+                ctrl_cov$signal <- ctrl_cov$signal / ctrl_cov$total_constituent_width
             }
 
             regions$control_signal <- ctrl_cov$signal
@@ -328,7 +328,7 @@ add_region_signal <- function(treatment,
             ctrl_cov$signal <- sum(ctrl_cov$coverage)
 
             if (normalize.by.width) {
-                ctrl_cov$signal <- ctrl_cov$signal / width(ctrl_cov)
+                ctrl_cov$signal <- ctrl_cov$signal / ctrl_cov$total_constituent_width
             }
 
             regions$control_signal <- ctrl_cov$signal
@@ -744,6 +744,10 @@ run_rose <- function(
 
     message("Stitching peaks with stitch distance of ", stitch.distance)
     peaks_stitched <- reduce(peaks, min.gapwidth = stitch.distance)
+
+    # Add total width of constituent peaks overlapping each stitched region to peaks_stitched
+    # Technically this will be inaccurate, as peaks fully overlapping promoters will be ignored but their signal still utilized.
+    peaks_stitched$total_constituent_width <- width(peaks[subjectHits(findOverlaps(peaks, peaks_stitched))])
 
     # Drop chrY as ROSE does
     if (drop.y) {

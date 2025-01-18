@@ -26,7 +26,6 @@ Imports:
     genomation,
     GenomicRanges,
     graphics,
-    HelloRanges,
     IRanges,
     Rsamtools,
     rtracklayer,
