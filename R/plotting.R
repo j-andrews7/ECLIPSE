@@ -77,7 +77,6 @@ plot_enhancer_curve <- function(regions,
                                 do.raster = FALSE,
                                 raster.dpi = 300,
                                 return.plotly = FALSE) {
-
     if (do.raster && !requireNamespace("ggrastr", quietly = TRUE)) {
         stop("Install the 'ggrastr' package (install.packages('ggrastr')) to use the 'do.raster' option.")
     }
@@ -103,7 +102,7 @@ plot_enhancer_curve <- function(regions,
         scale_size_manual(values = c("FALSE" = point.size, "TRUE" = se.point.size)) +
         labs(x = "Putative Enhancers", y = ylabel) +
         theme_classic()
-    
+
     if (plot.threshold.x) {
         p <- p + geom_vline(
             xintercept = length(regions$rankby_signal) - sum(regions$super),
@@ -135,6 +134,129 @@ plot_enhancer_curve <- function(regions,
 
     if (return.plotly) {
         p <- ggplotly(p)
+    }
+
+    p
+}
+
+
+#' Generate QQ Plot for a Specified Distribution
+#'
+#' @param data A GRanges object containing the data to fit in `mcols`.
+#' @param column A string specifying the column name in the `mcols(data)` to use for values.
+#' @param dist A string specifying the distribution to fit. Supported distributions include:
+#'   "beta", "cauchy", "chi-squared", "exponential", "gamma", "geometric", "log-normal", "lognormal",
+#'   "logistic", "negative binomial", "normal", "Poisson", "t", and "weibull".
+#' @param point.size Numeric value specifying the size of points in the QQ plot.
+#'   Default is 1.
+#' @param point.color A string specifying the color of points in the QQ plot.
+#'   Default is "blue".
+#' @param line.width Numeric value specifying the width of the reference line.
+#'   Default is 0.8.
+#' @param line.color A string specifying the color of the reference line.
+#'   Default is "red".
+#' @param do.raster Logical indicating whether to render the plot as a raster image.
+#'   Default is `FALSE`.
+#' @param raster.dpi Numeric value specifying the DPI of the raster image if `do.raster` is `TRUE`.
+#' @param return.plotly Logical indicating whether to return a plotly object.
+#'   Default is `FALSE`.
+#'
+#' @return A ggplot2 object.
+#'
+#' @importFrom ggplot2 geom_point geom_abline labs theme_bw
+#' @importFrom MASS fitdistr
+#' @importFrom stats ppoints qnorm qexp qgamma qpois qweibull qbeta qcauchy qchisq qgeom qlnorm qlogis qnbinom qt
+#' @importFrom S4Vectors mcols
+#'
+#' @export
+#'
+#' @author Jared Andrews
+#'
+#' @examples
+#' gr <- GRanges(
+#'     seqnames = rep("chr1", 1000),
+#'     ranges = IRanges(start = seq(1, by = 1000, length.out = 1000), end = seq(1000, by = 1000, length.out = 1000))
+#' )
+#' mcols(gr) <- DataFrame(values = rnorm(1000))
+#' plot_qq(data = gr, column = "values", dist = "normal")
+#' plot_qq(data = gr, column = "values", dist = "gamma")
+plot_qq <- function(
+    data, column, dist,
+    point.size = 1,
+    point.color = "blue",
+    line.width = 0.8,
+    line.color = "black",
+    do.raster = FALSE,
+    raster.dpi = 300,
+    return.plotly = FALSE) {
+    if (do.raster && !requireNamespace("ggrastr", quietly = TRUE)) {
+        stop("Install the 'ggrastr' package (install.packages('ggrastr')) to use the 'do.raster' option.")
+    }
+
+    if (return.plotly && !requireNamespace("plotly", quietly = TRUE)) {
+        stop("Install the 'plotly' package (install.packages('plotly')) to use the 'return.plotly' option.")
+    }
+
+    # Checks
+    if (!column %in% names(mcols(data))) {
+        stop("The specified column does not exist in the object.")
+    }
+
+    values <- mcols(data)[[column]]
+
+    if (!is.numeric(values)) {
+        stop("The specified column must contain numeric values.")
+    }
+
+    # Fit the specified distribution to the data
+    fit <- tryCatch(
+        MASS::fitdistr(values, dist),
+        error = function(e) stop("Error in fitting the distribution: ", e$message)
+    )
+
+    # Generate theoretical quantiles and empirical quantiles
+    n <- length(values)
+    theoretical_quantiles <- switch(dist,
+        "normal" = qnorm(ppoints(n), mean = fit$estimate["mean"], sd = fit$estimate["sd"]),
+        "exponential" = qexp(ppoints(n), rate = fit$estimate["rate"]),
+        "gamma" = qgamma(ppoints(n), shape = fit$estimate["shape"], rate = fit$estimate["rate"]),
+        "poisson" = qpois(ppoints(n), lambda = fit$estimate["lambda"]),
+        "weibull" = qweibull(ppoints(n), shape = fit$estimate["shape"], scale = fit$estimate["scale"]),
+        "beta" = qbeta(ppoints(n), shape1 = fit$estimate["shape1"], shape2 = fit$estimate["shape2"]),
+        "cauchy" = qcauchy(ppoints(n), location = fit$estimate["location"], scale = fit$estimate["scale"]),
+        "chi-squared" = qchisq(ppoints(n), df = fit$estimate["df"]),
+        "geometric" = qgeom(ppoints(n), prob = fit$estimate["prob"]),
+        "log-normal" = qlnorm(ppoints(n), meanlog = fit$estimate["meanlog"], sdlog = fit$estimate["sdlog"]),
+        "lognormal" = qlnorm(ppoints(n), meanlog = fit$estimate["meanlog"], sdlog = fit$estimate["sdlog"]),
+        "logistic" = qlogis(ppoints(n), location = fit$estimate["location"], scale = fit$estimate["scale"]),
+        "negative binomial" = qnbinom(ppoints(n), size = fit$estimate["size"], mu = fit$estimate["mu"]),
+        "t" = qt(ppoints(n), df = fit$estimate["df"]),
+        stop("Unsupported distribution: ", dist)
+    )
+
+    empirical_quantiles <- sort(values)
+
+    qq_df <- data.frame(
+        Theoretical = theoretical_quantiles,
+        Empirical = empirical_quantiles
+    )
+
+    p <- ggplot(qq_df, aes(x = Theoretical, y = Empirical)) +
+        geom_point(size = point.size, color = point.color) +
+        geom_abline(intercept = 0, slope = 1, linetype = "solid", color = line.color, linewidth = line.width) +
+        labs(
+            title = paste("QQ Plot for", dist, "distribution"),
+            x = "Theoretical Quantiles",
+            y = "Empirical Quantiles"
+        ) +
+        theme_bw()
+
+    if (do.raster) {
+        p <- ggrastr::rasterize(p, dpi = raster.dpi)
+    }
+
+    if (return.plotly) {
+        p <- plotly::ggplotly(p)
     }
 
     p

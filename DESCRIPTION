@@ -36,7 +36,9 @@ Imports:
     Gviz,
     csaw,
     stringi,
-    data.table
+    data.table,
+    MASS,
+    ggplot2
 Suggests:
     BiocStyle,
     knitr,
@@ -48,7 +50,8 @@ Suggests:
     DESeq2,
     apeglm,
     segmented,
-    ggrastr
+    ggrastr,
+    plotly
 Depends:
     R (>= 4.4.0)
 biocViews: 

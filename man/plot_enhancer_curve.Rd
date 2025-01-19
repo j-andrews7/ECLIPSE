@@ -7,14 +7,14 @@
 plot_enhancer_curve(
   regions,
   factor.label = NULL,
-  point.color = "grey50",
-  point.size = 2,
+  point.color = "black",
+  point.size = 1,
   se.point.color = "red",
-  se.point.size = 2,
+  se.point.size = 1.5,
   plot.threshold.x = TRUE,
   plot.threshold.y = TRUE,
   threshold.color = "grey30",
-  threshold.size = 0.5,
+  threshold.size = 0.75,
   show.legend = TRUE,
   do.raster = FALSE,
   raster.dpi = 300,
@@ -32,13 +32,13 @@ Default is \code{NULL}.}
 Default is "grey50".}
 
 \item{point.size}{Numeric value specifying the size of the points.
-Default is 2.}
+Default is 1.}
 
 \item{se.point.color}{Character string specifying the color of the super enhancer points.
 Default is "red".}
 
 \item{se.point.size}{Numeric value specifying the size of the super enhancer points.
-Default is 2.}
+Default is 1.5.}
 
 \item{plot.threshold.x}{Logical indicating whether to plot the x-axis threshold line.
 Default is \code{TRUE}.}
@@ -50,7 +50,7 @@ Default is \code{TRUE}.}
 Default is "grey30".}
 
 \item{threshold.size}{Numeric value specifying the width of the threshold line(s).
-Default is 0.5.}
+Default is 0.75.}
 
 \item{show.legend}{Logical indicating whether to show the legend.
 Default is \code{TRUE}.}
