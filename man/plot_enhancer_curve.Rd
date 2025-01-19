@@ -4,20 +4,67 @@
 \alias{plot_enhancer_curve}
 \title{Plot enhancer ranking curve}
 \usage{
-plot_enhancer_curve(regions, style = "ROSE", factor_label = NULL)
+plot_enhancer_curve(
+  regions,
+  factor.label = NULL,
+  point.color = "grey50",
+  point.size = 2,
+  se.point.color = "red",
+  se.point.size = 2,
+  plot.threshold.x = TRUE,
+  plot.threshold.y = TRUE,
+  threshold.color = "grey30",
+  threshold.size = 0.5,
+  show.legend = TRUE,
+  do.raster = FALSE,
+  raster.dpi = 300,
+  return.plotly = FALSE
+)
 }
 \arguments{
 \item{regions}{A GRanges object containing \code{rankby_signal} and \code{super} columns, as well as the \code{threshold} value in its metadata.}
 
-\item{style}{Character string specifying the plotting style.
-Default is "ROSE".}
-
-\item{factor_label}{Optional character string for prefixing the y-axis label with a specific factor,
+\item{factor.label}{Optional character string for prefixing the y-axis label with a specific factor,
 e.g. "(H3K27ac)".
 Default is \code{NULL}.}
+
+\item{point.color}{Character string specifying the color of the points.
+Default is "grey50".}
+
+\item{point.size}{Numeric value specifying the size of the points.
+Default is 2.}
+
+\item{se.point.color}{Character string specifying the color of the super enhancer points.
+Default is "red".}
+
+\item{se.point.size}{Numeric value specifying the size of the super enhancer points.
+Default is 2.}
+
+\item{plot.threshold.x}{Logical indicating whether to plot the x-axis threshold line.
+Default is \code{TRUE}.}
+
+\item{plot.threshold.y}{Logical indicating whether to plot the y-axis threshold line.
+Default is \code{TRUE}.}
+
+\item{threshold.color}{Character string specifying the color of the threshold line(s).
+Default is "grey30".}
+
+\item{threshold.size}{Numeric value specifying the width of the threshold line(s).
+Default is 0.5.}
+
+\item{show.legend}{Logical indicating whether to show the legend.
+Default is \code{TRUE}.}
+
+\item{do.raster}{Logical indicating whether to render the plot as a raster image.
+Default is \code{FALSE}.}
+
+\item{raster.dpi}{Numeric value specifying the DPI of the raster image if \code{do.raster} is \code{TRUE}.}
+
+\item{return.plotly}{Logical indicating whether to return a plotly object.
+Default is \code{FALSE}.}
 }
 \value{
-None. This function generates a plot.
+A ggplot or plotly object.
 }
 \description{
 Plots the enhancer ranking curve based on the signal values in the regions,
@@ -28,13 +75,19 @@ library(GenomicRanges)
 
 set.seed(7)
 num_elements <- 1000
-regions <- GRanges(seqnames = rep("chr1", num_elements),
-                   ranges = IRanges(start = seq(1, by = 1000, length.out = num_elements),
-                                    end = seq(1000, by = 1000, length.out = num_elements)))
+regions <- GRanges(
+    seqnames = rep("chr1", num_elements),
+    ranges = IRanges(
+        start = seq(1, by = 1000, length.out = num_elements),
+        end = seq(1000, by = 1000, length.out = num_elements)
+    )
+)
 
 # Add random signal values and classify as super enhancers
-regions$rankby_signal <- c(rnorm(num_elements - 50, mean = 150, sd = 10), 
-                           rnorm(50, mean = 250, sd = 50))
+regions$rankby_signal <- c(
+    rnorm(num_elements - 50, mean = 150, sd = 10),
+    rnorm(50, mean = 250, sd = 50)
+)
 regions$super <- regions$rankby_signal > 170
 metadata(regions)$threshold <- 170
 

@@ -27,8 +27,9 @@ Default is 1.}
 
 \item{read.ext}{Numeric value for extending reads downstream. Default is 200.}
 
-\item{normalize.by.width}{Logical indicating whether to normalize signal by region width.
-\code{FALSE} by default, as ROSE does this, but then it undoes it in a later step, so what's the point?}
+\item{normalize.by.width}{Logical indicating whether to normalize signal by total width of constituent elements.
+\code{FALSE} by default, as ROSE does this based on total region width rather than constituent elements,
+but then it undoes it in a later step, so what's the point?}
 }
 \value{
 A GRanges object for \code{regions} with additional columns for sample and control (if provided) signal.

@@ -47,7 +47,8 @@ Suggests:
     org.Hs.eg.db,
     DESeq2,
     apeglm,
-    segmented
+    segmented,
+    ggrastr
 Depends:
     R (>= 4.4.0)
 biocViews: 
