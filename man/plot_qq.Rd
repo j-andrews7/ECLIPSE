@@ -14,7 +14,8 @@ plot_qq(
   line.color = "black",
   do.raster = FALSE,
   raster.dpi = 300,
-  return.plotly = FALSE
+  return.plotly = FALSE,
+  ...
 )
 }
 \arguments{
@@ -46,6 +47,8 @@ Default is \code{FALSE}.}
 
 \item{return.plotly}{Logical indicating whether to return a plotly object.
 Default is \code{FALSE}.}
+
+\item{...}{Additional arguments to pass to \code{MASS::fitdistr}.}
 }
 \value{
 A ggplot2 object.

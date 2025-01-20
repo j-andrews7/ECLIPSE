@@ -161,6 +161,7 @@ plot_enhancer_curve <- function(regions,
 #' @param raster.dpi Numeric value specifying the DPI of the raster image if `do.raster` is `TRUE`.
 #' @param return.plotly Logical indicating whether to return a plotly object.
 #'   Default is `FALSE`.
+#' @param ... Additional arguments to pass to `MASS::fitdistr`.
 #'
 #' @return A ggplot2 object.
 #'
@@ -189,7 +190,8 @@ plot_qq <- function(
     line.color = "black",
     do.raster = FALSE,
     raster.dpi = 300,
-    return.plotly = FALSE) {
+    return.plotly = FALSE,
+    ...) {
     if (do.raster && !requireNamespace("ggrastr", quietly = TRUE)) {
         stop("Install the 'ggrastr' package (install.packages('ggrastr')) to use the 'do.raster' option.")
     }
@@ -205,7 +207,7 @@ plot_qq <- function(
         }
 
         values <- mcols(data)[[column]]
-    } else if (class(data) == "data.frame") {
+    } else if (class(data) == "data.frame" || class(data) == "DFrame") {
         if (!column %in% colnames(data)) {
             stop("The specified column does not exist in the object.")
         }
@@ -219,9 +221,16 @@ plot_qq <- function(
         stop("The specified column must contain numeric values.")
     }
 
+    empirical_quantiles <- sort(values)
+
+    # Round the empirical quantiles for discrete distributions
+    if (dist %in% c("poisson", "geometric", "negative binomial")) {
+        empirical_quantiles <- round(empirical_quantiles)
+    }
+
     # Fit the specified distribution to the data
     fit <- tryCatch(
-        MASS::fitdistr(values, dist),
+        MASS::fitdistr(empirical_quantiles, dist, ...),
         error = function(e) stop("Error in fitting the distribution: ", e$message)
     )
 
@@ -244,8 +253,6 @@ plot_qq <- function(
         "t" = qt(ppoints(n), df = fit$estimate["df"]),
         stop("Unsupported distribution: ", dist)
     )
-
-    empirical_quantiles <- sort(values)
 
     qq_df <- data.frame(
         Theoretical = theoretical_quantiles,

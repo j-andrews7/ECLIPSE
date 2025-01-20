@@ -95,8 +95,6 @@ naiveB1_enhancers_width_normalized <- run_rose(treatment = treat_bam, control = 
                               max.unique.gene.tss.overlap = 2,
                               drop.no.signal = TRUE,
                               normalize.by.width = TRUE)
-
-naiveB1_enhancers
 ```
 
 ### Other Input Types
@@ -594,6 +592,8 @@ winsorize_maintain_rank_minmax_transform <- function(x, upper_quantile = 0.999, 
 Now for each transformation function, we'll apply it to the signal to the signal column and plot the histograms, qqplots, and rank plot.
 
 ```{r}
+library(patchwork)
+
 # Named list of transformations, underscore delimiter
 transformations <- list(
   no_transform = function(x) x,
@@ -639,14 +639,14 @@ for (i in seq_along(transformed_SEs)) {
     ses <- transformed_SEs[[i]]
     sigs <- ses$rankby_signal
     df <- data.frame(signal = sigs)
-    p <- ggplot(df, mapping = aes(signal)) + geom_histogram(bins = 75) + labs(title = (names(transformations)[[i]]), x = "Transformed Signal")  + theme_bw()
-    p2 <- plot_qq(ses, "rankby_signal", "normal") + labs(subtitle = (names(transformations)[[i]]), do.raster = TRUE)
+    p <- ggplot(df, mapping = aes(signal)) + geom_histogram(bins = 75) + labs(title = (names(transformations)[[i]]), x = "Transformed Signal")  + theme_bw() + theme(aspect.ratio = 1)
+    p2 <- plot_qq(ses, "rankby_signal", "normal") + labs(subtitle = (names(transformations)[[i]]), do.raster = TRUE) + theme(aspect.ratio = 1)
     p3 <- NULL
     if (min(sigs) > 0) {
-        p3 <- plot_qq(ses, "rankby_signal", "lognormal") + labs(subtitle = (names(transformations)[[i]]), do.raster = TRUE)
+        p3 <- plot_qq(ses, "rankby_signal", "lognormal") + labs(subtitle = (names(transformations)[[i]]), do.raster = TRUE) + theme(aspect.ratio = 1)
     }
-    p4 <- plot_qq(ses, "rankby_signal", "poisson") + labs(subtitle = (names(transformations)[[i]]), do.raster = TRUE)
-    p5 <- plot_enhancer_curve(ses, factor.label = "H3K27ac", do.raster = TRUE, show.legend = FALSE)
+    p4 <- plot_qq(ses, "rankby_signal", "negative binomial") + labs(subtitle = (names(transformations)[[i]]), do.raster = TRUE) + theme(aspect.ratio = 1)
+    p5 <- plot_enhancer_curve(ses, factor.label = "H3K27ac", do.raster = TRUE, show.legend = FALSE) + theme(aspect.ratio = 1)
     
     print(p + p2 + p3 + p4 + p5)
 }
@@ -665,14 +665,14 @@ for (i in seq_along(transformed_SEs_width_norm)) {
     ses <- transformed_SEs_width_norm[[i]]
     sigs <- ses$rankby_signal
     df <- data.frame(signal = sigs)
-    p <- ggplot(df, mapping = aes(signal)) + geom_histogram(bins = 75) + labs(title = (names(transformations)[[i]]), x = "Transformed Signal") + theme_bw()
-    p2 <- plot_qq(ses, "rankby_signal", "normal") + labs(subtitle = (names(transformations)[[i]]), do.raster = TRUE)
+    p <- ggplot(df, mapping = aes(signal)) + geom_histogram(bins = 75) + labs(title = (names(transformations)[[i]]), x = "Transformed Signal") + theme_bw() + theme(aspect.ratio = 1)
+    p2 <- plot_qq(ses, "rankby_signal", "normal") + labs(subtitle = (names(transformations)[[i]]), do.raster = TRUE) + theme(aspect.ratio = 1)
     p3 <- NULL
     if (min(sigs) > 0) {
-        p3 <- plot_qq(ses, "rankby_signal", "lognormal") + labs(subtitle = (names(transformations)[[i]]), do.raster = TRUE)
+        p3 <- plot_qq(ses, "rankby_signal", "lognormal") + labs(subtitle = (names(transformations)[[i]]), do.raster = TRUE) + theme(aspect.ratio = 1)
     }
-    p4 <- plot_qq(ses, "rankby_signal", "poisson") + labs(subtitle = (names(transformations)[[i]]), do.raster = TRUE)
-    p5 <- plot_enhancer_curve(ses, factor.label = "H3K27ac", do.raster = TRUE, show.legend = FALSE)
+    p4 <- plot_qq(ses, "rankby_signal", "negative binomial") + labs(subtitle = (names(transformations)[[i]]), do.raster = TRUE) + theme(aspect.ratio = 1)
+    p5 <- plot_enhancer_curve(ses, factor.label = "H3K27ac", do.raster = TRUE, show.legend = FALSE) + theme(aspect.ratio = 1)
     
     print(p + p2 + p3 + p4 + p5)
 }
