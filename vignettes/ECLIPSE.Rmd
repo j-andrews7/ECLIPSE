@@ -634,21 +634,21 @@ names(transformed_SEs) <- names(transformations)
 
 # Plot histograms and qqplots in PDF with new page for each transformation, both plots on one page
 pdf("transformed_signal_distributions.NaiveB1.pdf", width = 25, height = 6)
-par(mfrow = c(1, 3))
 for (i in seq_along(transformed_SEs)) {
     message(names(transformations)[[i]])
     ses <- transformed_SEs[[i]]
     sigs <- ses$rankby_signal
-    hist(sigs, main = names(transformations)[[i]], xlab = "Transformed Signal", breaks = 75)
-    p <- plot_qq(ses, "rankby_signal", "normal") + labs(subtitle = (names(transformations)[[i]]), do.raster = TRUE)
-    print(p)
+    df <- data.frame(signal = sigs)
+    p <- ggplot(df, mapping = aes(signal)) + geom_histogram(bins = 75) + labs(title = (names(transformations)[[i]]), x = "Transformed Signal")  + theme_bw()
+    p2 <- plot_qq(ses, "rankby_signal", "normal") + labs(subtitle = (names(transformations)[[i]]), do.raster = TRUE)
+    p3 <- NULL
     if (min(sigs) > 0) {
-        p <- plot_qq(ses, "rankby_signal", "lognormal") + labs(subtitle = (names(transformations)[[i]]), do.raster = TRUE)
-        print(p)
+        p3 <- plot_qq(ses, "rankby_signal", "lognormal") + labs(subtitle = (names(transformations)[[i]]), do.raster = TRUE)
     }
-    p <- plot_qq(ses, "rankby_signal", "poisson") + labs(subtitle = (names(transformations)[[i]]), do.raster = TRUE)
-    print(p)
-    plot_enhancer_curve(ses, factor.label = "H3K27ac", do.raster = TRUE, show.legend = FALSE)
+    p4 <- plot_qq(ses, "rankby_signal", "poisson") + labs(subtitle = (names(transformations)[[i]]), do.raster = TRUE)
+    p5 <- plot_enhancer_curve(ses, factor.label = "H3K27ac", do.raster = TRUE, show.legend = FALSE)
+    
+    print(p + p2 + p3 + p4 + p5)
 }
 dev.off()
 
@@ -660,21 +660,21 @@ transformed_SEs_width_norm <- lapply(transformations, function(f) {
 
 # Plot histograms and qqplots in PDF with new page for each transformation, both plots on one page
 pdf("transformed_signal_distributions.NaiveB1.width_norm.pdf", width = 25, height = 6)
-par(mfrow = c(1, 3))
 for (i in seq_along(transformed_SEs_width_norm)) {
     message(names(transformations)[[i]])
     ses <- transformed_SEs_width_norm[[i]]
     sigs <- ses$rankby_signal
-    hist(sigs, main = names(transformations)[[i]], xlab = "Transformed Signal", breaks = 75)
-    p <- plot_qq(ses, "rankby_signal", "normal") + labs(subtitle = (names(transformations)[[i]]), do.raster = TRUE)
-    print(p)
+    df <- data.frame(signal = sigs)
+    p <- ggplot(df, mapping = aes(signal)) + geom_histogram(bins = 75) + labs(title = (names(transformations)[[i]]), x = "Transformed Signal") + theme_bw()
+    p2 <- plot_qq(ses, "rankby_signal", "normal") + labs(subtitle = (names(transformations)[[i]]), do.raster = TRUE)
+    p3 <- NULL
     if (min(sigs) > 0) {
-        p <- plot_qq(ses, "rankby_signal", "lognormal") + labs(subtitle = (names(transformations)[[i]]), do.raster = TRUE)
-        print(p)
+        p3 <- plot_qq(ses, "rankby_signal", "lognormal") + labs(subtitle = (names(transformations)[[i]]), do.raster = TRUE)
     }
-    p <- plot_qq(ses, "rankby_signal", "poisson") + labs(subtitle = (names(transformations)[[i]]), do.raster = TRUE)
-    print(p)
-    plot_enhancer_curve(ses, factor.label = "H3K27ac", do.raster = TRUE, show.legend = FALSE)
+    p4 <- plot_qq(ses, "rankby_signal", "poisson") + labs(subtitle = (names(transformations)[[i]]), do.raster = TRUE)
+    p5 <- plot_enhancer_curve(ses, factor.label = "H3K27ac", do.raster = TRUE, show.legend = FALSE)
+    
+    print(p + p2 + p3 + p4 + p5)
 }
 dev.off()
 ```

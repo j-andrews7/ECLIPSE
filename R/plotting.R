@@ -142,8 +142,9 @@ plot_enhancer_curve <- function(regions,
 
 #' Generate QQ Plot for a Specified Distribution
 #'
-#' @param data A GRanges object containing the data to fit in `mcols`.
-#' @param column A string specifying the column name in the `mcols(data)` to use for values.
+#' @param data A data.frame containing the values to plot.
+#'   Alternatively, a GRanges object, in which case the values are extracted from the specified column of `mcols(data)`.
+#' @param column A string specifying the column name to use for values.
 #' @param dist A string specifying the distribution to fit. Supported distributions include:
 #'   "beta", "cauchy", "chi-squared", "exponential", "gamma", "geometric", "log-normal", "lognormal",
 #'   "logistic", "negative binomial", "normal", "Poisson", "t", and "weibull".
@@ -197,12 +198,22 @@ plot_qq <- function(
         stop("Install the 'plotly' package (install.packages('plotly')) to use the 'return.plotly' option.")
     }
 
-    # Checks
-    if (!column %in% names(mcols(data))) {
-        stop("The specified column does not exist in the object.")
-    }
+    # Check if the data is a GRanges object
+    if (class(data) == "GRanges") {
+        if (!column %in% colnames(mcols(data))) {
+            stop("The specified column does not exist in the object.")
+        }
 
-    values <- mcols(data)[[column]]
+        values <- mcols(data)[[column]]
+    } else if (class(data) == "data.frame") {
+        if (!column %in% colnames(data)) {
+            stop("The specified column does not exist in the object.")
+        }
+
+        values <- data[[column]]
+    } else {
+        stop("The data must be a GRanges or data.frame object.")
+    }
 
     if (!is.numeric(values)) {
         stop("The specified column must contain numeric values.")

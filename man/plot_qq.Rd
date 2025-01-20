@@ -18,9 +18,10 @@ plot_qq(
 )
 }
 \arguments{
-\item{data}{A GRanges object containing the data to fit in \code{mcols}.}
+\item{data}{A data.frame containing the values to plot.
+Alternatively, a GRanges object, in which case the values are extracted from the specified column of \code{mcols(data)}.}
 
-\item{column}{A string specifying the column name in the \code{mcols(data)} to use for values.}
+\item{column}{A string specifying the column name to use for values.}
 
 \item{dist}{A string specifying the distribution to fit. Supported distributions include:
 "beta", "cauchy", "chi-squared", "exponential", "gamma", "geometric", "log-normal", "lognormal",
