@@ -645,8 +645,8 @@ classify_enhancers <- function(regions,
 #' @importFrom Rsamtools indexBam
 #' @importFrom genomation readBed
 #' @importFrom GenomicRanges reduce seqnames trim
-#' @importFrom S4Vectors queryHits
-#' @importFrom IRanges findOverlaps
+#' @importFrom S4Vectors queryHits subjectHits
+#' @importFrom IRanges findOverlaps pintersect width
 #'
 #' @export
 #'
@@ -748,22 +748,22 @@ run_rose <- function(
     # Technically this will be inaccurate, as peaks fully overlapping promoters will be ignored but their signal still utilized.
     # For each stitched region, we will sum the width of the constituent peaks that overlap it.
     # Find overlaps between the smaller and wider ranges
-    overlaps <- findOverlaps(peaks_stitched, peaks)
+    # overlaps <- findOverlaps(peaks_stitched, peaks)
 
-    query_hits <- queryHits(overlaps)
-    subject_hits <- subjectHits(overlaps)
+    # query_hits <- queryHits(overlaps)
+    # subject_hits <- subjectHits(overlaps)
 
-    # Calculate the sum of peak widths for each stitched region
-    overlap_data <- data.frame(
-        wide_range_idx = query_hits,
-        peak_width = width(peaks[subject_hits])
-    )
+    # # Calculate the sum of peak widths for each stitched region
+    # overlap_data <- data.frame(
+    #     wide_range_idx = query_hits,
+    #     peak_width = width(peaks[subject_hits])
+    # )
 
-    sum_widths <- aggregate(peak_width ~ wide_range_idx, data = overlap_data, sum)
+    # sum_widths <- aggregate(peak_width ~ wide_range_idx, data = overlap_data, sum)
 
-    # Add the calculated sums as a column to the peaks_stitched object
-    peaks_stitched$total_constituent_width <- 0
-    peaks_stitched$total_constituent_width[sum_widths$wide_range_idx] <- sum_widths$peak_width
+    # # Add the calculated sums as a column to the peaks_stitched object
+    # peaks_stitched$total_constituent_width <- 0
+    # peaks_stitched$total_constituent_width[sum_widths$wide_range_idx] <- sum_widths$peak_width
 
     # Drop chrY as ROSE does
     if (drop.y) {
@@ -784,6 +784,13 @@ run_rose <- function(
         hits <- unstitched$hits
         message("Unstitched ", sum(hits$unstitch), " regions")
     }
+
+    message("Calculating total constituent peak width for each stitched region")
+    hits <- findOverlaps(peaks_stitched, peaks)
+    peaks_stitched.over <- pintersect(peaks_stitched[queryHits(hits)], peaks[subjectHits(hits)])
+    peaks_stitched.counts <- tapply(peaks_stitched.over, queryHits(hits), FUN=function(x) sum(width(x)))
+    peaks_stitched$total_constituent_width <- 0
+    peaks_stitched$total_constituent_width[as.numeric(names(peaks_stitched.counts))] <- unname(peaks_stitched.counts)
 
     message("Calculating normalized signal for ", length(peaks_stitched), " stitched regions")
     regions <- add_region_signal(treatment, peaks_stitched, control = control, floor = floor, read.ext = read.ext, normalize.by.width = normalize.by.width)
