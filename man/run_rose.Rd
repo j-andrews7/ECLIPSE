@@ -34,7 +34,8 @@ run_rose(
   promoter.dist = c(2000, 200),
   active.genes = NULL,
   identify.active.genes = FALSE,
-  omit.unknown = TRUE
+  omit.unknown = TRUE,
+  force = FALSE
 )
 }
 \arguments{
@@ -144,6 +145,9 @@ Default is \code{FALSE}.}
 \item{omit.unknown}{Logical indicating whether uncharacterized genes (i.e., gene symbols starting with \emph{LOC})
 should be excluded from annotations.
 Default is \code{TRUE}.}
+
+\item{force}{Logical indicating whether to force recalculation of coverage and stitching even if \code{sample_signal} is found.
+Default is \code{FALSE}.}
 }
 \value{
 A \code{GRanges} object containing the classified regions and associated metadata of each,
@@ -176,7 +180,7 @@ that result in a consistent curve shape with a known maximum, like cumulative pr
 \dontrun{
 sample.bam <- "path/to/sample.bam"
 peaks <- "path/to/peaks.bed"
-result <- run_rose(sample.bam, peaks)
+result <- run_rose(sample.bam, peaks, force = TRUE)
 }
 }
 \author{
