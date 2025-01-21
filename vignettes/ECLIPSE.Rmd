@@ -679,6 +679,23 @@ for (i in seq_along(transformed_SEs_width_norm)) {
 dev.off()
 ```
 
+## Re-running with Different Parameters
+
+If already run, one can re-run `run_rose` without performing stitching, re-calculating coverage, and annotating, which is much faster.
+Simply set `force = FALSE` in the `run_rose` call and regigon stitching, coverage calculation, and annotation will be skipped.
+This allows one to test different transformations or thresholding methods very quickly.
+
+```{r}
+# Let's try log2(x + 1) as a transformation.
+naiveB1_enhancers_from_existing <- run_rose(peaks = naiveB1_enhancers,
+                                            transformation = function(x) log2(x + 1), 
+                                            force = FALSE)
+
+plot_enhancer_curve(naiveB1_enhancers_from_existing, factor.label = "H3K27ac", show.legend = FALSE)
+```
+
+Runs almost instantly, huzzah.
+
 ## Differential Sub-Structural Analysis
 
 ECLIPSE also provides functionality to identify sub-structural changes within super enhancer regions between groups via differential analysis of small bins.

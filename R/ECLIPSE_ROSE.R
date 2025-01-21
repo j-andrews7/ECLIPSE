@@ -559,8 +559,8 @@ classify_enhancers <- function(regions,
 #' - The "arbitrary" method allows for the user to specify a fixed threshold, useful for transformations
 #'   that result in a consistent curve shape with a known maximum, like cumulative proportion of signal.
 #'
-#' @param treatment A `BamFile` or `GRanges` object representing the sample signal.
 #' @param peaks A  `GRanges` object representing the peaks.
+#' @param treatment A `BamFile` or `GRanges` object representing the sample signal.
 #' @param control A `BamFile` or `GRanges` object representing the control (usually input or IgG) signal.
 #'   Default is `NULL`.
 #' @param stitch.distance Numeric value for the distance within which peaks are stitched together.
@@ -636,6 +636,8 @@ classify_enhancers <- function(regions,
 #' @param omit.unknown Logical indicating whether uncharacterized genes (i.e., gene symbols starting with *LOC*)
 #'   should be excluded from annotations.
 #'   Default is `TRUE`.
+#' @param force Logical indicating whether to force recalculation of coverage and stitching even if `sample_signal` is found.
+#'   Default is `TRUE`.
 #'
 #' @return A `GRanges` object containing the classified regions and associated metadata of each,
 #'   including super enhancer status.
@@ -654,11 +656,11 @@ classify_enhancers <- function(regions,
 #' \dontrun{
 #' sample.bam <- "path/to/sample.bam"
 #' peaks <- "path/to/peaks.bed"
-#' result <- run_rose(sample.bam, peaks)
+#' result <- run_rose(peaks, sample.bam, force = TRUE)
 #' }
 run_rose <- function(
-    treatment,
     peaks,
+    treatment = NULL,
     control = NULL,
     stitch.distance = 12500,
     tss.exclusion.distance = 0,
@@ -686,9 +688,10 @@ run_rose <- function(
     promoter.dist = c(2000, 200),
     active.genes = NULL,
     identify.active.genes = FALSE,
-    omit.unknown = TRUE) {
+    omit.unknown = TRUE,
+    force = FALSE) {
     # Check that treatment is a BamFile or GRanges object
-    if (!is(treatment, "BamFile") && !is(treatment, "GRanges")) {
+    if (!is.null(treatment) && !is(treatment, "BamFile") && !is(treatment, "GRanges")) {
         stop("treatment must be a BamFile or GRanges object")
     }
 
@@ -707,10 +710,12 @@ run_rose <- function(
         stop("thresh.method must be one of 'ROSE', 'first', 'second_diff', 'curvature', 'segmented', 'chord', 'mad', or 'arbitrary'")
     }
 
-    if (is(treatment, "BamFile")) {
-        if (length(treatment$index) == 0 || !file.exists(treatment$index)) {
-            message("Treatment BAM index not found. Generating an index.")
-            treatment$index <- unname(indexBam(treatment))
+    if (!is.null(control)) {
+        if (is(treatment, "BamFile")) {
+            if (length(treatment$index) == 0 || !file.exists(treatment$index)) {
+                message("Treatment BAM index not found. Generating an index.")
+                treatment$index <- unname(indexBam(treatment))
+            }
         }
     }
 
@@ -725,60 +730,65 @@ run_rose <- function(
 
     message(length(peaks), " peaks provided")
 
-    if (tss.exclusion.distance > 0) {
-        if (is.null(txdb)) {
-            stop("txdb must be provided if tss.exclusion.distance is greater than 0")
+    if (!force && !is.null(peaks$sample_signal)) {
+        message("sample_signal found in peaks and force is FALSE, skipping region stitching, calculating coverage, and annotation")
+        regions <- peaks
+    } else {
+        if (tss.exclusion.distance > 0) {
+            if (is.null(txdb)) {
+                stop("txdb must be provided if tss.exclusion.distance is greater than 0")
+            }
+
+            message("Excluding peaks within TSS exclusion distance of ", tss.exclusion.distance)
+            tss <- promoters(txdb, upstream = tss.exclusion.distance, downstream = tss.exclusion.distance, columns = "GENEID")
+
+            # Create susbset of stitched peaks that do not overlap TSS and remove
+            overlaps <- findOverlaps(peaks, tss, type = "within")
+
+            contained_indices <- queryHits(overlaps)
+
+            message(length(unique(contained_indices)), " peaks fully contained within TSS exclusion window and will be excluded from stitching")
+            peaks <- peaks[-unique(contained_indices)]
         }
 
-        message("Excluding peaks within TSS exclusion distance of ", tss.exclusion.distance)
-        tss <- promoters(txdb, upstream = tss.exclusion.distance, downstream = tss.exclusion.distance, columns = "GENEID")
+        message("Stitching peaks with stitch distance of ", stitch.distance)
+        peaks_stitched <- reduce(peaks, min.gapwidth = stitch.distance)
 
-        # Create susbset of stitched peaks that do not overlap TSS and remove
-        overlaps <- findOverlaps(peaks, tss, type = "within")
-
-        contained_indices <- queryHits(overlaps)
-
-        message(length(unique(contained_indices)), " peaks fully contained within TSS exclusion window and will be excluded from stitching")
-        peaks <- peaks[-unique(contained_indices)]
-    }
-
-    message("Stitching peaks with stitch distance of ", stitch.distance)
-    peaks_stitched <- reduce(peaks, min.gapwidth = stitch.distance)
-
-    # Drop chrY as ROSE does
-    if (drop.y) {
-        peaks.chr <- as.vector(seqnames(peaks_stitched))
-        message("Dropped ", length(which(peaks.chr == "chrY")), " peaks on chrY")
-        peaks_stitched <- peaks_stitched[peaks.chr != "chrY"]
-    }
-
-    if (!is.null(max.unique.gene.tss.overlap)) {
-        if (is.null(txdb)) {
-            stop("txdb must be provided if max.unique.gene.tss.overlap is not NULL")
+        # Drop chrY as ROSE does
+        if (drop.y) {
+            peaks.chr <- as.vector(seqnames(peaks_stitched))
+            message("Dropped ", length(which(peaks.chr == "chrY")), " peaks on chrY")
+            peaks_stitched <- peaks_stitched[peaks.chr != "chrY"]
         }
 
-        tss <- promoters(txdb, upstream = tss.overlap.distance, downstream = tss.overlap.distance, columns = "GENEID")
-        message("Unstitching regions overlapping TSS from more than ", max.unique.gene.tss.overlap, " unique genes")
-        unstitched <- unstitch_regions(peaks_stitched, peaks, tss, threshold = max.unique.gene.tss.overlap)
-        peaks_stitched <- unstitched$regions
-        hits <- unstitched$hits
-        message("Unstitched ", sum(hits$unstitch), " regions")
+        if (!is.null(max.unique.gene.tss.overlap)) {
+            if (is.null(txdb)) {
+                stop("txdb must be provided if max.unique.gene.tss.overlap is not NULL")
+            }
+
+            tss <- promoters(txdb, upstream = tss.overlap.distance, downstream = tss.overlap.distance, columns = "GENEID")
+            message("Unstitching regions overlapping TSS from more than ", max.unique.gene.tss.overlap, " unique genes")
+            unstitched <- unstitch_regions(peaks_stitched, peaks, tss, threshold = max.unique.gene.tss.overlap)
+            peaks_stitched <- unstitched$regions
+            hits <- unstitched$hits
+            message("Unstitched ", sum(hits$unstitch), " regions")
+        }
+
+        # Drop all mcols to clean up output and avoid carrying along anything from the original peaks.
+        mcols(peaks_stitched) <- NULL
+
+        # Technically this will be inaccurate, as peaks fully overlapping promoters will be ignored but their signal still utilized.
+        # For each stitched region, we will sum the width of the constituent peaks that overlap it.
+        message("Calculating total constituent peak width for each stitched region")
+        hits <- findOverlaps(peaks_stitched, peaks)
+        peaks_stitched.over <- pintersect(peaks_stitched[queryHits(hits)], peaks[subjectHits(hits)])
+        peaks_stitched.counts <- tapply(peaks_stitched.over, queryHits(hits), FUN=function(x) sum(width(x)))
+        peaks_stitched$total_constituent_width <- 0
+        peaks_stitched$total_constituent_width[as.numeric(names(peaks_stitched.counts))] <- unname(peaks_stitched.counts)
+
+        message("Calculating normalized signal for ", length(peaks_stitched), " stitched regions")
+        regions <- add_region_signal(treatment, peaks_stitched, control = control, floor = floor, read.ext = read.ext, normalize.by.width = normalize.by.width)
     }
-
-    # Drop all mcols to clean up output and avoid carrying along anything from the original peaks.
-    mcols(peaks_stitched) <- NULL
-
-    # Technically this will be inaccurate, as peaks fully overlapping promoters will be ignored but their signal still utilized.
-    # For each stitched region, we will sum the width of the constituent peaks that overlap it.
-    message("Calculating total constituent peak width for each stitched region")
-    hits <- findOverlaps(peaks_stitched, peaks)
-    peaks_stitched.over <- pintersect(peaks_stitched[queryHits(hits)], peaks[subjectHits(hits)])
-    peaks_stitched.counts <- tapply(peaks_stitched.over, queryHits(hits), FUN=function(x) sum(width(x)))
-    peaks_stitched$total_constituent_width <- 0
-    peaks_stitched$total_constituent_width[as.numeric(names(peaks_stitched.counts))] <- unname(peaks_stitched.counts)
-
-    message("Calculating normalized signal for ", length(peaks_stitched), " stitched regions")
-    regions <- add_region_signal(treatment, peaks_stitched, control = control, floor = floor, read.ext = read.ext, normalize.by.width = normalize.by.width)
 
     message("Ranking regions")
     regions <- add_signal_rank(regions, negative.to.zero = negative.to.zero, drop.no.signal = drop.no.signal)
@@ -795,7 +805,7 @@ run_rose <- function(
         segmented.breakpoints = segmented.breakpoints
     )
 
-    if (annotate) {
+    if (annotate & force) {
         if (!is.null(txdb) & !is.null(org.db)) {
             message("Annotating regions")
             regions <- annotate_enhancers(regions, peaks,
