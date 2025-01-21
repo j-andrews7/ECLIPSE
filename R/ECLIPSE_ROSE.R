@@ -745,26 +745,6 @@ run_rose <- function(
     message("Stitching peaks with stitch distance of ", stitch.distance)
     peaks_stitched <- reduce(peaks, min.gapwidth = stitch.distance)
 
-    # Technically this will be inaccurate, as peaks fully overlapping promoters will be ignored but their signal still utilized.
-    # For each stitched region, we will sum the width of the constituent peaks that overlap it.
-    # Find overlaps between the smaller and wider ranges
-    # overlaps <- findOverlaps(peaks_stitched, peaks)
-
-    # query_hits <- queryHits(overlaps)
-    # subject_hits <- subjectHits(overlaps)
-
-    # # Calculate the sum of peak widths for each stitched region
-    # overlap_data <- data.frame(
-    #     wide_range_idx = query_hits,
-    #     peak_width = width(peaks[subject_hits])
-    # )
-
-    # sum_widths <- aggregate(peak_width ~ wide_range_idx, data = overlap_data, sum)
-
-    # # Add the calculated sums as a column to the peaks_stitched object
-    # peaks_stitched$total_constituent_width <- 0
-    # peaks_stitched$total_constituent_width[sum_widths$wide_range_idx] <- sum_widths$peak_width
-
     # Drop chrY as ROSE does
     if (drop.y) {
         peaks.chr <- as.vector(seqnames(peaks_stitched))
@@ -785,6 +765,11 @@ run_rose <- function(
         message("Unstitched ", sum(hits$unstitch), " regions")
     }
 
+    # Drop all mcols to clean up output and avoid carrying along anything from the original peaks.
+    mcols(peaks_stitched) <- NULL
+
+    # Technically this will be inaccurate, as peaks fully overlapping promoters will be ignored but their signal still utilized.
+    # For each stitched region, we will sum the width of the constituent peaks that overlap it.
     message("Calculating total constituent peak width for each stitched region")
     hits <- findOverlaps(peaks_stitched, peaks)
     peaks_stitched.over <- pintersect(peaks_stitched[queryHits(hits)], peaks[subjectHits(hits)])
