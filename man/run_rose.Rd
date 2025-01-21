@@ -5,8 +5,8 @@
 \title{Run ROSE (Rank Ordering of Super-Enhancers)}
 \usage{
 run_rose(
-  treatment,
   peaks,
+  treatment = NULL,
   control = NULL,
   stitch.distance = 12500,
   tss.exclusion.distance = 0,
@@ -39,9 +39,9 @@ run_rose(
 )
 }
 \arguments{
-\item{treatment}{A \code{BamFile} or \code{GRanges} object representing the sample signal.}
-
 \item{peaks}{A  \code{GRanges} object representing the peaks.}
+
+\item{treatment}{A \code{BamFile} or \code{GRanges} object representing the sample signal.}
 
 \item{control}{A \code{BamFile} or \code{GRanges} object representing the control (usually input or IgG) signal.
 Default is \code{NULL}.}
@@ -147,7 +147,7 @@ should be excluded from annotations.
 Default is \code{TRUE}.}
 
 \item{force}{Logical indicating whether to force recalculation of coverage and stitching even if \code{sample_signal} is found.
-Default is \code{FALSE}.}
+Default is \code{TRUE}.}
 }
 \value{
 A \code{GRanges} object containing the classified regions and associated metadata of each,
@@ -180,7 +180,7 @@ that result in a consistent curve shape with a known maximum, like cumulative pr
 \dontrun{
 sample.bam <- "path/to/sample.bam"
 peaks <- "path/to/peaks.bed"
-result <- run_rose(sample.bam, peaks, force = TRUE)
+result <- run_rose(peaks, sample.bam, force = TRUE)
 }
 }
 \author{

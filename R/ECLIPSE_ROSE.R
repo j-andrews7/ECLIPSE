@@ -559,8 +559,8 @@ classify_enhancers <- function(regions,
 #' - The "arbitrary" method allows for the user to specify a fixed threshold, useful for transformations
 #'   that result in a consistent curve shape with a known maximum, like cumulative proportion of signal.
 #'
-#' @param treatment A `BamFile` or `GRanges` object representing the sample signal.
 #' @param peaks A  `GRanges` object representing the peaks.
+#' @param treatment A `BamFile` or `GRanges` object representing the sample signal.
 #' @param control A `BamFile` or `GRanges` object representing the control (usually input or IgG) signal.
 #'   Default is `NULL`.
 #' @param stitch.distance Numeric value for the distance within which peaks are stitched together.
@@ -637,7 +637,7 @@ classify_enhancers <- function(regions,
 #'   should be excluded from annotations.
 #'   Default is `TRUE`.
 #' @param force Logical indicating whether to force recalculation of coverage and stitching even if `sample_signal` is found.
-#'   Default is `FALSE`.
+#'   Default is `TRUE`.
 #'
 #' @return A `GRanges` object containing the classified regions and associated metadata of each,
 #'   including super enhancer status.
@@ -656,11 +656,11 @@ classify_enhancers <- function(regions,
 #' \dontrun{
 #' sample.bam <- "path/to/sample.bam"
 #' peaks <- "path/to/peaks.bed"
-#' result <- run_rose(sample.bam, peaks, force = TRUE)
+#' result <- run_rose(peaks, sample.bam, force = TRUE)
 #' }
 run_rose <- function(
-    treatment,
     peaks,
+    treatment = NULL,
     control = NULL,
     stitch.distance = 12500,
     tss.exclusion.distance = 0,
@@ -691,7 +691,7 @@ run_rose <- function(
     omit.unknown = TRUE,
     force = FALSE) {
     # Check that treatment is a BamFile or GRanges object
-    if (!is(treatment, "BamFile") && !is(treatment, "GRanges")) {
+    if (!is.null(treatment) && !is(treatment, "BamFile") && !is(treatment, "GRanges")) {
         stop("treatment must be a BamFile or GRanges object")
     }
 
@@ -710,10 +710,12 @@ run_rose <- function(
         stop("thresh.method must be one of 'ROSE', 'first', 'second_diff', 'curvature', 'segmented', 'chord', 'mad', or 'arbitrary'")
     }
 
-    if (is(treatment, "BamFile")) {
-        if (length(treatment$index) == 0 || !file.exists(treatment$index)) {
-            message("Treatment BAM index not found. Generating an index.")
-            treatment$index <- unname(indexBam(treatment))
+    if (!is.null(control)) {
+        if (is(treatment, "BamFile")) {
+            if (length(treatment$index) == 0 || !file.exists(treatment$index)) {
+                message("Treatment BAM index not found. Generating an index.")
+                treatment$index <- unname(indexBam(treatment))
+            }
         }
     }
 
@@ -729,7 +731,7 @@ run_rose <- function(
     message(length(peaks), " peaks provided")
 
     if (!force && !is.null(peaks$sample_signal)) {
-        message("sample_signal found in peaks and force is FALSE, skipping recalculating coverage and stitching")
+        message("sample_signal found in peaks and force is FALSE, skipping region stitching, calculating coverage, and annotation")
         regions <- peaks
     } else {
         if (tss.exclusion.distance > 0) {
@@ -803,7 +805,7 @@ run_rose <- function(
         segmented.breakpoints = segmented.breakpoints
     )
 
-    if (annotate) {
+    if (annotate & force) {
         if (!is.null(txdb) & !is.null(org.db)) {
             message("Annotating regions")
             regions <- annotate_enhancers(regions, peaks,
