@@ -188,8 +188,9 @@ unstitch_regions <- function(stitched, original, tss, id.col = "GENEID", thresho
 #'   Coverage must be greater than this value to be counted in the signal.
 #'   Default is 1.
 #' @param read.ext Numeric value for extending reads downstream. Default is 200.
-#' @param normalize.by.width Logical indicating whether to normalize signal by region width.
-#'   `FALSE` by default, as ROSE does this, but then it undoes it in a later step, so what's the point?
+#' @param normalize.by.width Logical indicating whether to normalize signal by total width of constituent elements.
+#'   `FALSE` by default, as ROSE does this based on total region width rather than constituent elements, 
+#'   but then it undoes it in a later step, so what's the point?
 #'
 #' @return A GRanges object for `regions` with additional columns for sample and control (if provided) signal.
 #'   The metadata of the object will also contain the scaling factor for library size normalization for the `treatment`
@@ -201,7 +202,6 @@ unstitch_regions <- function(stitched, original, tss, id.col = "GENEID", thresho
 #' @importFrom rtracklayer import
 #' @importFrom S4Vectors 'metadata<-'
 #' @importFrom GenomicRanges granges trim coverage
-#' @importFrom HelloRanges do_bedtools_coverage
 #' @importFrom IRanges IRanges
 #'
 #' @author Jared Andrews
@@ -262,8 +262,6 @@ add_region_signal <- function(treatment,
             samp_reads <- extend_reads(samp_reads, downstream = read.ext)
         }
 
-        # samp_cov <- do_bedtools_coverage(a = regions, b = samp_reads, d = TRUE)
-
         cov <- unname(coverage(samp_reads)[regions])
         samp_cov <- regions
         mcols(samp_cov)$coverage <- cov
@@ -274,7 +272,7 @@ add_region_signal <- function(treatment,
         samp_cov$signal <- samp_cov$coverage / samp_mmr
 
         if (normalize.by.width) {
-            samp_cov$signal <- samp_cov$signal / width(samp_cov)
+            samp_cov$signal <- samp_cov$signal / samp_cov$total_constituent_width
         }
 
         regions$sample_signal <- samp_cov$signal
@@ -288,7 +286,7 @@ add_region_signal <- function(treatment,
         samp_cov$signal <- sum(samp_cov$coverage)
 
         if (normalize.by.width) {
-            samp_cov$signal <- samp_cov$signal / width(samp_cov)
+            samp_cov$signal <- samp_cov$signal / samp_cov$total_constituent_width
         }
 
         regions$sample_signal <- samp_cov$signal
@@ -306,12 +304,18 @@ add_region_signal <- function(treatment,
                 ctrl_reads <- extend_reads(ctrl_reads, downstream = read.ext)
             }
 
-            ctrl_cov <- do_bedtools_coverage(a = regions, b = ctrl_reads, d = TRUE)
+            cov <- unname(coverage(ctrl_reads)[regions])
+            ctrl_cov <- regions
+            mcols(ctrl_cov)$coverage <- cov
 
             ctrl_cov$coverage <- ctrl_cov$coverage[ctrl_cov$coverage > floor]
             ctrl_cov$coverage <- sum(ctrl_cov$coverage)
 
             ctrl_cov$signal <- ctrl_cov$coverage / ctrl_mmr
+
+            if (normalize.by.width) {
+                ctrl_cov$signal <- ctrl_cov$signal / ctrl_cov$total_constituent_width
+            }
 
             regions$control_signal <- ctrl_cov$signal
             metadata(regions)$control_mmr <- ctrl_mmr
@@ -324,7 +328,7 @@ add_region_signal <- function(treatment,
             ctrl_cov$signal <- sum(ctrl_cov$coverage)
 
             if (normalize.by.width) {
-                ctrl_cov$signal <- ctrl_cov$signal / width(ctrl_cov)
+                ctrl_cov$signal <- ctrl_cov$signal / ctrl_cov$total_constituent_width
             }
 
             regions$control_signal <- ctrl_cov$signal
@@ -416,7 +420,7 @@ add_signal_rank <- function(regions, negative.to.zero = TRUE, drop.no.signal = F
 #' @return A `GRanges` object with a new `super` logical column indicating whether the enhancer is classified as a super enhancer.
 #'   A `rankby_signal` column is added as the final signal values used for ranking (post-transformation, if applied).
 #'   Any transformations applied, the thresholding method used, the threshold, and the number of dropped regions if
-#'   `drop.zeros = TRUE` are added to the metadata of the `GRanges` object.
+#'   `drop.no.signal = TRUE` are added to the metadata of the `GRanges` object.
 #'
 #' @export
 #'
@@ -438,7 +442,6 @@ add_signal_rank <- function(regions, negative.to.zero = TRUE, drop.no.signal = F
 #' classified_regions <- classify_enhancers(regions, thresh.method = "ROSE")
 classify_enhancers <- function(regions,
                                transformation = NULL,
-                               drop.zeros = FALSE,
                                thresh.method = "ROSE",
                                rose.slope = NULL,
                                first.threshold = 0.5,
@@ -461,14 +464,6 @@ classify_enhancers <- function(regions,
     }
 
     metadata(regions)$threshold_method <- thresh.method
-
-    if (drop.zeros) {
-        num_no_sig_regions <- NROW(regions[regions$rank_signal == 0])
-        message(paste("Dropped", num_no_sig_regions, "regions due to no signal"))
-        metadata(regions)$dropped_zero_count <- num_no_sig_regions
-        regions <- regions[regions$rank_signal > 0]
-        regions$region_rank <- seq_len(NROW(regions))
-    }
 
     # Keep track of whether to use transformed signal.
     use_transformed <- FALSE
@@ -588,6 +583,7 @@ classify_enhancers <- function(regions,
 #'   Default is `TRUE`.
 #' @param drop.no.signal Logical indicating whether to remove regions with negative or zero values in the ranking signal.
 #'   Default is `FALSE`.
+#'   This is done prior to any transformation.
 #' @param thresh.method Character string specifying the method to determine the signal threshold.
 #'   Must be one of "ROSE", "first", "second_diff", "segmented", "chord", "curvature", "mad", or "arbitrary".
 #'   Default is "ROSE".
@@ -622,8 +618,6 @@ classify_enhancers <- function(regions,
 #'   Default is 200. Ignored if inputs are `GRanges` objects.
 #' @param normalize.by.width Logical indicating whether to normalize signal by region width.
 #'   ROSE does this, but then undoes it at a later step, so `FALSE` is the default.
-#' @param drop.zeros Logical indicating whether to drop regions with zero signal.
-#'   Default is `FALSE`.
 #' @param annotate Logical indicating whether annotations should be provided.
 #'   Default is `TRUE`.
 #' @param annotate.dist Numeric specifying the flanking distance (in bp) around the region to use
@@ -651,8 +645,8 @@ classify_enhancers <- function(regions,
 #' @importFrom Rsamtools indexBam
 #' @importFrom genomation readBed
 #' @importFrom GenomicRanges reduce seqnames trim
-#' @importFrom S4Vectors queryHits
-#' @importFrom IRanges findOverlaps
+#' @importFrom S4Vectors queryHits subjectHits
+#' @importFrom IRanges findOverlaps pintersect width
 #'
 #' @export
 #'
@@ -687,7 +681,6 @@ run_rose <- function(
     floor = 1,
     read.ext = 200,
     normalize.by.width = FALSE,
-    drop.zeros = FALSE,
     annotate = TRUE,
     annotate.dist = 50000,
     promoter.dist = c(2000, 200),
@@ -772,6 +765,18 @@ run_rose <- function(
         message("Unstitched ", sum(hits$unstitch), " regions")
     }
 
+    # Drop all mcols to clean up output and avoid carrying along anything from the original peaks.
+    mcols(peaks_stitched) <- NULL
+
+    # Technically this will be inaccurate, as peaks fully overlapping promoters will be ignored but their signal still utilized.
+    # For each stitched region, we will sum the width of the constituent peaks that overlap it.
+    message("Calculating total constituent peak width for each stitched region")
+    hits <- findOverlaps(peaks_stitched, peaks)
+    peaks_stitched.over <- pintersect(peaks_stitched[queryHits(hits)], peaks[subjectHits(hits)])
+    peaks_stitched.counts <- tapply(peaks_stitched.over, queryHits(hits), FUN=function(x) sum(width(x)))
+    peaks_stitched$total_constituent_width <- 0
+    peaks_stitched$total_constituent_width[as.numeric(names(peaks_stitched.counts))] <- unname(peaks_stitched.counts)
+
     message("Calculating normalized signal for ", length(peaks_stitched), " stitched regions")
     regions <- add_region_signal(treatment, peaks_stitched, control = control, floor = floor, read.ext = read.ext, normalize.by.width = normalize.by.width)
 
@@ -781,7 +786,6 @@ run_rose <- function(
     message("Classifying enhancers")
     regions <- classify_enhancers(regions,
         transformation = transformation,
-        drop.zeros = drop.zeros,
         thresh.method = thresh.method,
         rose.slope = rose.slope,
         first.threshold = first.threshold,

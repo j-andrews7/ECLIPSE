@@ -81,7 +81,11 @@ naiveB1_enhancers
     - ~~And ability to disable this process.~~
   - ~~Enhancer-gene annotations (within 50 kb by default for ROSE).~~
     - ~~Ability to limit to expressed genes.~~
-- Allow BigWig or GRanges signal as input.
+- ~~Allow BigWig or GRanges signal as input.~~
+- Add customizable visualization functions via Gviz.
+- Add Shiny application for interactive exploration of results via igvShiny.
+- Allow group-wise calling with sensible peak filtering via rmscp to mitigate effects of peak numbers on number of SEs identified due to daisy chaining effects.
+- Additional experimentation and recommended parameters for various data modalities (H3K27ac, ATAC, H3K4me1, etc).
 
 ## References
 

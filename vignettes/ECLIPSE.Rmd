@@ -63,6 +63,9 @@ library(TxDb.Hsapiens.UCSC.hg38.knownGene)
 library(org.Hs.eg.db)
 
 txdb <- TxDb.Hsapiens.UCSC.hg38.knownGene
+
+# Limit to canonical chromosomes, out of bound warnings will abound if not done
+txdb <- keepStandardChromosomes(txdb, pruning.mode = "coarse")
 org.db <- org.Hs.eg.db
 
 bfc <- BiocFileCache(ask = FALSE)
@@ -84,9 +87,14 @@ peaks <- readBed(peaks_path)
 
 naiveB1_enhancers <- run_rose(treatment = treat_bam, control = control_bam, peaks = peaks,
                               txdb = txdb, org.db = org.db, stitch.distance = 12500, tss.exclusion.distance = 2500,
-                              max.unique.gene.tss.overlap = 2)
+                              max.unique.gene.tss.overlap = 2,
+                              drop.no.signal = TRUE)
 
-naiveB1_enhancers
+naiveB1_enhancers_width_normalized <- run_rose(treatment = treat_bam, control = control_bam, peaks = peaks,
+                              txdb = txdb, org.db = org.db, stitch.distance = 12500, tss.exclusion.distance = 2500,
+                              max.unique.gene.tss.overlap = 2,
+                              drop.no.signal = TRUE,
+                              normalize.by.width = TRUE)
 ```
 
 ### Other Input Types
@@ -130,19 +138,19 @@ We have closely examined and tested the ROSE source code and have made the follo
  1. ROSE does not use region size scaling for final signal ranking in a meaningful way. The signals in ROSE are derived as follows:
    - All reads overlapping a given region are pulled.
    - These reads are extended by 200 bp.
-   - The coverage for each base in the region is counted (via samtools view, which is very slow when done on each individual region).
+   - The coverage for each base in the region is counted (via samtools view, which is very slow when done on each individual region). 
+     - There are alternative implementations floating around Github that use a tool called bamliquidator that is much faster, but it's also difficult to install and poorly supported.
    - The coverage for the region is summed and divided by the region width to generate a density factor.
    - The density factor is then divided by the MMR factor (mapped reads/1000000) to generate a library size-normalized signal factor.
    - This factor is saved for each stitched region into the "mapped GFF" files.
    - The "signal" is then calculated from the "mapped GFF" files for the stitched regions by multiplying the library size-normalized factor by the width of the region. Ultimately, this just results in the library size-normalized sum of coverage for a region, independent of its size (ADD EXAMPLE TO DEMONSTRATE THIS.)
      - This biases ROSE towards large regions, potentially ignoring smaller regions that have a higher signal density that may still have an outsized regulatory impact. This is worth exploring further.
-   - ECLIPSE provides an option (`normalize.by.width`) to scale the final signal by the region width. 
-     - In the future, we will add ways to include only the width of reasonable signal regions (either by using the sum of constituent elements widths or bases with some reasonable level of signal) in this calculation.
+   - ECLIPSE provides an option (`normalize.by.width`) to scale the final signal by the total constituent peak width for each region.
  2. ROSE has a bug in the unstitching process whereby it rarely does not unstitch regions that clearly span TSSes from 3 or more unique genes.
    - What exactly the bug is remains unclear, but it may be related to how ROSE is performing overlaps.
    - ECLIPSE does not have this issue, which alters the final number of regions returned (and thus SEs called) to a minor degree.
  3. Outliers have an outsized impact on the signal ranking and final classifications in ROSE.
-   - To elaborate, if you remove the top 5 or 10 regions by signal, the ranking of the remaining regions changes dramatically and the threshold for super-enhancer classification is much different. This results in non-robust classifications whereby you can easily get 100s more/less SEs from sample to sample of the exact same tissue or cell type just depending on how dramatic the outliers are.
+   - To elaborate, if you remove the top 5 or 10 regions by signal, the ranking of the remaining regions changes dramatically and the threshold for super-enhancer classification is much different. This results in fickle classifications whereby you can easily get 100s more/less SEs from sample to sample of the exact same tissue or cell type just depending on how dramatic the outliers are.
    - We *highly* recommend using the transformation capabilities included in ECLIPSE to monotonically transform the signal prior to ranking, which will dramatically reduce the impact of outliers on the final classification while maintaining the same rank. See the `transformation`, `thresh.method`, `first.threshold`, and `arbitrary.threshold` parameters in `?run_rose` for options and additional information.
    
 This list is incomplete and will be updated as we continue to explore the differences between ECLIPSE and ROSE.
@@ -151,7 +159,7 @@ This list is incomplete and will be updated as we continue to explore the differ
 
 ROSE is frequently ran with TSS exclusion to remove peaks fully contained within a window (usually +/- 2.5kb) around each TSS.
 
-What is less well documented in the original ROSE implementation is that this also invokes an unstitching process of regions that span TSSes (+/- 50 bp) from 3 or more unique genes, whereby a stitched region is then split back into its original constituent elements. 
+What is less well documented in the original ROSE implementation is that this also invokes an unstitching process of regions that overlap TSSes (+/- 50 bp) from 3 or more unique genes, whereby a stitched region is then split back into its original constituent elements. 
 
 The original implementation provides no way to alter or disable this behavior, but ECLIPSE does.
 
@@ -200,8 +208,29 @@ message("Average width of SEs with TSS exclusion and unstitching: ", mean(width(
 message("Average width of SEs with TSS exclusion and no unstitching: ", mean(width(res_tss_exl_no_unstitch[res_tss_exl_no_unstitch$super])))
 ```
 
-
 Given the lack of documentation or discussion on this behavior in the original implementation or papers, it is unclear how this should be handled in practice.
+
+### Other Previously Hidden Parameters
+
+**ECLIPSE** also allows things like read extension length to be adjusted, which ROSE sets at 200 with no convenient way to adjust.
+
+Though this is a reasonable estimate for most ChIP-seq data, we can also determine the fragment length from the data as specified by [csaw](https://bioconductor.org/books/3.20/csawBook/counting-reads-into-windows.html#sec:ccf).
+
+```{r}
+# Removing duplicates for this is often necessary as there tends to be an artifactual peak at a distance equal to the read length.
+dedup.param <- readParam(minq=20, dedup=TRUE)
+x <- correlateReads(treat_path, max.dist = 500, param = dedup.param)
+plot(0:500, x, type="l", ylab="CCF", xlab="Delay (bp)")
+```
+
+200 bp is a reasonable estimate, but we could also use the peak of the cross-correlation function as the 
+fragment length to provide to the `read.ext` parameter in `run_rose`.
+
+```{r}
+frag.len <- maximizeCcf(x)
+frag.len
+```
+
 
 ## Using BigWig or bedGraph Inputs
 
@@ -227,7 +256,428 @@ naiveB1_enhancers_bigwig <- run_rose(treatment = naiveB1_bw, peaks = peaks,
                               max.unique.gene.tss.overlap = 2, floor = 0, normalize.by.width = TRUE)
 ```
 
+## Exploring Transformations & Thresholding Methods
 
+As mentioned above, ROSE is highly sensitive to outliers in the signal, which can dramatically alter the final classification of regions.
+ECLIPSE provides a parameter for applying a transformation function to all regions prior to ranking to reduce the impact of outliers on the final classification.
+
+However, it is unclear which transformation(s) are most appropriate for this task.
+These transformations may also change the shape of the curve, which may necessitate a change in the thresholding method used.
+
+### Transformations
+
+As it stands, the original ROSE implementation uses an arbitrary thresholding approach.
+It'd be nice to use a more statistically rigorous approach based on the distribution of the (potentially width-normalized) signal for each region.
+
+It'd be convenient if we could get a relatively normal distribution of signal values for each region, which would allow us to use a Z-score or similar approach to thresholding.
+
+As such, let's test a few transformations, make some histograms/qqplots, and see what looks best.
+We will also do this for width-normalized signal to see how that looks.
+
+```{r}
+logistic_transform_scaled_robust <- function(x) {
+  center <- median(x, na.rm = TRUE)
+  spread <- IQR(x, na.rm = TRUE) # interquartile range
+  if (spread == 0) spread <- 1   # fallback if IQR=0
+  
+  1 / (1 + exp(-(x - center) / spread))
+}
+
+probit_transform_scaled_robust <- function(x) {
+  center <- median(x, na.rm = TRUE)
+  spread <- IQR(x, na.rm = TRUE)
+  if (spread == 0) spread <- 1
+  
+  pnorm((x - center) / spread)
+}
+
+
+# --------------------------------------------------
+# 2) Winsorized Min–Max Scaling
+# --------------------------------------------------
+#   - Caps extreme values at chosen quantiles
+#   - Then applies linear min–max scaling
+#   - Maps data into [0, 1]
+
+winsorized_minmax_scale <- function(x, upper_quantile = 0.999, lower_quantile = 0.01) {
+  # 1) Identify cutoffs
+  q_high <- quantile(x, probs = upper_quantile)
+  q_low  <- quantile(x, probs = lower_quantile)
+  
+  # 2) Winsorize
+  x_winsor <- pmax(pmin(x, q_high), q_low)
+  
+  # 3) Min–Max scaling
+  x_min <- min(x_winsor)
+  x_max <- max(x_winsor)
+  
+  (x_winsor - x_min) / (x_max - x_min)
+}
+
+
+# --------------------------------------------------
+# 3) Rank-Inverse Normal Transform (RINT)
+# --------------------------------------------------
+#   - Rank the data -> convert rank to percentile -> map via inverse normal
+#   - Often used to create data with near-Gaussian distribution
+
+rint_transform <- function(x) {
+  # 1) Get rank-based percentile
+  r <- rank(x, ties.method = "average", na.last = "keep")
+  n <- sum(!is.na(x))
+  # Convert rank to a fraction in (0,1). 
+  # Add a small offset to avoid exactly 0 or 1.
+  p <- (r - 0.5) / n
+  
+  # 2) Map percentiles via inverse normal (qnorm)
+  qnorm(p)
+}
+
+
+# --------------------------------------------------
+# 4) Combination: Log + Min–Max
+# --------------------------------------------------
+#   - First apply a log-like transform (log or log1p) 
+#   - Then map results into [0,1] with min–max scaling
+#   - Uses pseudocount to avoid 0/negative values
+
+log_minmax_transform <- function(x) {
+  # 1) Log transform
+  x_log <- log1p(x) # or simply log(x_shifted)
+  
+  # 2) Min–Max scale
+  x_min <- min(x_log)
+  x_max <- max(x_log)
+  (x_log - x_min) / (x_max - x_min)
+}
+
+
+# --------------------------------------------------
+# 5) Combination: asinh + Min–Max
+# --------------------------------------------------
+#   - arcsinh is a 'soft log' that can handle negative values
+#   - Then do min–max scaling
+#   - Very useful when data can be negative and large positive
+
+asinh_minmax_transform <- function(x, scale_param = 1) {
+  # 1) 'soft log' transform
+  x_asinh <- asinh(scale_param * x)
+  
+  # 2) Min–Max scale
+  x_min <- min(x_asinh)
+  x_max <- max(x_asinh)
+  
+  (x_asinh - x_min) / (x_max - x_min)
+}
+
+
+# --------------------------------------------------
+# Other basic transforms
+# --------------------------------------------------
+
+## Power transform: x^alpha
+power_transform <- function(x, alpha = 0.2) {
+  x^alpha
+}
+
+# Normalize to between [0, 1] and then cube to create more separation at high values 
+scale_cube_transform <- function(x) { 
+    x <- x
+    mmax <- max(x)
+    mmin <- min(x)
+    x <- (x-mmin)/pmax(mmax-mmin, 1e-8)
+    x <- x^3
+    x
+}
+
+# Cumulative proportion of signal for each element
+cumal_prop_transform <- function(x) {
+    x <- x/sum(x)
+    x <- cumsum(x)
+    x <- 1 - x # Reverse so that the highest values are at the top
+    x
+}
+
+# Cumulative proportion of signal for each element
+cumal_prop_log2_transform <- function(x) {
+    x <- log2(x)
+    x <- x/sum(x)
+    x <- cumsum(x)
+    x <- 1 - x # Reverse so that the highest values are at the top
+    x
+}
+
+## sqrt transform
+sqrt_transform <- function(x) {
+  sqrt(x)
+}
+
+## cuberoot transform
+cuberoot_transform <- function(x) {
+  x^(1/3)
+}
+
+## Box-Cox: (x^lambda - 1) / lambda, with log fallback
+boxcox_transform <- function(x, lambda = 0.2) {
+  if (lambda == 0) {
+    log(x)
+  } else {
+    (x^lambda - 1) / lambda
+  }
+}
+
+## Robust z-score transform: (x - median) / MAD
+robust_z_transform <- function(x) {
+  (x - median(x)) / mad(x)
+}
+
+## And with log2 transformation first
+robust_log2_z_transform <- function(x) {
+  (log2(x) - median(log2(x))) / mad(log2(x))
+}
+
+## log1p transform: log(1 + x)
+log1p_transform <- function(x) {
+  log1p(x)
+}
+
+## arcsinh transform
+asinh_transform <- function(x) {
+  asinh(x)
+}
+
+## arcsinh with scaling
+asinh_transform_scaled <- function(x) {
+    scale <- IQR(x, na.rm = TRUE) # interquartile range
+    asinh(scale * x) / scale
+}
+
+## Classic min–max (no winsorizing)
+minmax_scale <- function(x) {
+  (x - min(x)) / (max(x) - min(x))
+}
+
+## Logistic transform (simple)
+logistic_transform <- function(x) {
+  1 / (1 + exp(-x))
+}
+
+# Winsorization
+winsorize_transform <- function(x, upper_quantile = 0.999, lower_quantile = 0.01) {
+    q_high <- quantile(x, probs = upper_quantile)
+    q_low  <- quantile(x, probs = lower_quantile)
+    
+    pmax(pmin(x, q_high), q_low)
+}
+
+# Modified winsorization where rank of winsorized values are maintained by adding rank of winsorized values * a pseudocount
+# Only applied to upper quantile.
+winsorize_maintain_rank_transform <- function(x,
+                                  upper_quantile = 0.999,
+                                  pseudocount = 0.001) {
+  # 1) Find the capping threshold
+  cap_value <- quantile(x, probs = upper_quantile)
+  message("Winsorizing at value: ", cap_value)
+  
+  # 2) Identify which x values exceed that threshold
+  idx_above <- which(x > cap_value)
+  
+  if (length(idx_above) > 0) {
+
+      # 3) Extract the subset of x that are above the threshold
+      x_above <- x[idx_above]
+      
+      # 4) Determine the relative rank among these "above" values
+      #    We'll assign a strictly increasing offset based on rank order.
+      #    Order them from smallest to largest, then assign rank 1, 2, 3, ...
+      order_above <- order(x_above)       # returns indices of x_above in ascending order
+      ranks       <- seq_along(x_above)   # 1 to number of capped points
+
+      new_values <- numeric(length(x_above))
+      
+      # 5) For each capped value, set it to cap_value + (pseudocount * rank)
+      #    This ensures no ties among capped points and preserves their internal order.
+      for (i in seq_along(order_above)) {
+        # 'order_above[i]' is the index in 'x_above' of the i-th smallest capped value
+        idx_in_x_above <- order_above[i]  # e.g. i-th smallest gets rank i
+        new_values[idx_in_x_above] <- cap_value + (pseudocount * ranks[i])
+      }
+      
+      # 6) Put these new values back into 'x' at the original positions of the capped points
+      x_wins <- x
+      x[idx_above] <- new_values
+    }
+  x
+}
+
+# log2(x + 1) + Winsorization
+log2_winsorize_transform <- function(x, upper_quantile = 0.999, lower_quantile = 0.01) {
+    x <- log2(x + 1)
+    q_high <- quantile(x, probs = upper_quantile)
+    q_low  <- quantile(x, probs = lower_quantile)
+    
+    pmax(pmin(x, q_high), q_low)
+}
+
+# Modified winsorization where rank of winsorized values are maintained by adding rank of winsorized values * a pseudocount
+# Only applied to upper quantile.
+log2_winsorize_maintain_rank_transform <- function(x,
+                                  upper_quantile = 0.999,
+                                  pseudocount = 0.001) {
+    x <- log2(x + 1)
+  # 1) Find the capping threshold
+  cap_value <- quantile(x, probs = upper_quantile)
+  message("Winsorizing at value: ", cap_value)
+  
+  # 2) Identify which x values exceed that threshold
+  idx_above <- which(x > cap_value)
+  
+  if (length(idx_above) > 0) {
+
+      # 3) Extract the subset of x that are above the threshold
+      x_above <- x[idx_above]
+      
+      # 4) Determine the relative rank among these "above" values
+      #    We'll assign a strictly increasing offset based on rank order.
+      #    Order them from smallest to largest, then assign rank 1, 2, 3, ...
+      order_above <- order(x_above)       # returns indices of x_above in ascending order
+      ranks       <- seq_along(x_above)   # 1 to number of capped points
+
+      new_values <- numeric(length(x_above))
+      
+      # 5) For each capped value, set it to cap_value + (pseudocount * rank)
+      #    This ensures no ties among capped points and preserves their internal order.
+      for (i in seq_along(order_above)) {
+        # 'order_above[i]' is the index in 'x_above' of the i-th smallest capped value
+        idx_in_x_above <- order_above[i]  # e.g. i-th smallest gets rank i
+        new_values[idx_in_x_above] <- cap_value + (pseudocount * ranks[i])
+      }
+      
+      # 6) Put these new values back into 'x' at the original positions of the capped points
+      x_wins <- x
+      x[idx_above] <- new_values
+    }
+  x
+}
+
+# Try winsorized min-max scale with rank maintenance
+winsorize_maintain_rank_minmax_transform <- function(x, upper_quantile = 0.999, pseudocount = 0.001) {
+  # Winsorize with rank maintenance
+  cap_value <- quantile(x, probs = upper_quantile)
+  idx_above <- which(x > cap_value)
+  
+  if (length(idx_above) > 0) {
+    x_above <- x[idx_above]
+    order_above <- order(x_above)
+    ranks <- seq_along(x_above)
+    new_values <- numeric(length(x_above))
+    
+    for (i in seq_along(order_above)) {
+      idx_in_x_above <- order_above[i]
+      new_values[idx_in_x_above] <- cap_value + (pseudocount * ranks[i])
+    }
+    
+    x[idx_above] <- new_values
+  }
+  
+  # Min–Max scaling
+  x_min <- min(x)
+  x_max <- max(x)
+  
+  (x - x_min) / (x_max - x_min)
+}
+
+```
+
+Now for each transformation function, we'll apply it to the signal to the signal column and plot the histograms, qqplots, and rank plot.
+
+```{r}
+library(patchwork)
+
+# Named list of transformations, underscore delimiter
+transformations <- list(
+  no_transform = function(x) x,
+  logistic_transform_scaled_robust = logistic_transform_scaled_robust,
+  probit_transform_scaled_robust = probit_transform_scaled_robust,
+  winsorized_minmax_scale = winsorized_minmax_scale,
+  rint_transform = rint_transform,
+  log_minmax_transform = log_minmax_transform,
+  asinh_minmax_transform = asinh_minmax_transform,
+  power_transform = power_transform,
+  scale_cube_transform = scale_cube_transform,
+  cumal_prop_transform = cumal_prop_transform,
+  cumal_prop_log2_transform = cumal_prop_log2_transform,
+  sqrt_transform = sqrt_transform,
+  cuberoot_transform = cuberoot_transform,
+  boxcox_transform = boxcox_transform,
+  robust_z_transform = robust_z_transform,
+  #robust_log2_z_transform = robust_log2_z_transform,
+  log1p_transform = log1p_transform,
+  asinh_transform = asinh_transform,
+  asinh_transform_scaled = asinh_transform_scaled,
+  minmax_scale = minmax_scale,
+  logistic_transform = logistic_transform,
+  winsorize_transform = winsorize_transform,
+  winsorize_maintain_rank_transform = winsorize_maintain_rank_transform,
+  log2_winsorize_transform = log2_winsorize_transform,
+  log2_winsorize_maintain_rank_transform = log2_winsorize_maintain_rank_transform,
+  winsorize_maintain_rank_minmax_transform = winsorize_maintain_rank_minmax_transform
+)
+
+transformed_SEs <- lapply(transformations, function(f) {
+    ses <- naiveB1_enhancers
+    ses$rankby_signal <- f(ses$rank_signal)
+    ses
+})
+
+names(transformed_SEs) <- names(transformations)
+
+# Plot histograms and qqplots in PDF with new page for each transformation, both plots on one page
+pdf("transformed_signal_distributions.NaiveB1.pdf", width = 25, height = 6)
+for (i in seq_along(transformed_SEs)) {
+    message(names(transformations)[[i]])
+    ses <- transformed_SEs[[i]]
+    sigs <- ses$rankby_signal
+    df <- data.frame(signal = sigs)
+    p <- ggplot(df, mapping = aes(signal)) + geom_histogram(bins = 75) + labs(title = (names(transformations)[[i]]), x = "Transformed Signal")  + theme_bw() + theme(aspect.ratio = 1)
+    p2 <- plot_qq(ses, "rankby_signal", "normal") + labs(subtitle = (names(transformations)[[i]]), do.raster = TRUE) + theme(aspect.ratio = 1)
+    p3 <- NULL
+    if (min(sigs) > 0) {
+        p3 <- plot_qq(ses, "rankby_signal", "lognormal") + labs(subtitle = (names(transformations)[[i]]), do.raster = TRUE) + theme(aspect.ratio = 1)
+    }
+    p4 <- plot_qq(ses, "rankby_signal", "negative binomial") + labs(subtitle = (names(transformations)[[i]]), do.raster = TRUE) + theme(aspect.ratio = 1)
+    p5 <- plot_enhancer_curve(ses, factor.label = "H3K27ac", do.raster = TRUE, show.legend = FALSE) + theme(aspect.ratio = 1)
+    
+    print(p + p2 + p3 + p4 + p5)
+}
+dev.off()
+
+transformed_SEs_width_norm <- lapply(transformations, function(f) {
+    ses <- naiveB1_enhancers_width_normalized
+    ses$rankby_signal <- f(ses$rank_signal)
+    ses
+})
+
+# Plot histograms and qqplots in PDF with new page for each transformation, both plots on one page
+pdf("transformed_signal_distributions.NaiveB1.width_norm.pdf", width = 25, height = 6)
+for (i in seq_along(transformed_SEs_width_norm)) {
+    message(names(transformations)[[i]])
+    ses <- transformed_SEs_width_norm[[i]]
+    sigs <- ses$rankby_signal
+    df <- data.frame(signal = sigs)
+    p <- ggplot(df, mapping = aes(signal)) + geom_histogram(bins = 75) + labs(title = (names(transformations)[[i]]), x = "Transformed Signal") + theme_bw() + theme(aspect.ratio = 1)
+    p2 <- plot_qq(ses, "rankby_signal", "normal") + labs(subtitle = (names(transformations)[[i]]), do.raster = TRUE) + theme(aspect.ratio = 1)
+    p3 <- NULL
+    if (min(sigs) > 0) {
+        p3 <- plot_qq(ses, "rankby_signal", "lognormal") + labs(subtitle = (names(transformations)[[i]]), do.raster = TRUE) + theme(aspect.ratio = 1)
+    }
+    p4 <- plot_qq(ses, "rankby_signal", "negative binomial") + labs(subtitle = (names(transformations)[[i]]), do.raster = TRUE) + theme(aspect.ratio = 1)
+    p5 <- plot_enhancer_curve(ses, factor.label = "H3K27ac", do.raster = TRUE, show.legend = FALSE) + theme(aspect.ratio = 1)
+    
+    print(p + p2 + p3 + p4 + p5)
+}
+dev.off()
+```
 
 ## Differential Sub-Structural Analysis
 

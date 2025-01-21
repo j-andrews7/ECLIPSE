@@ -351,7 +351,7 @@ get_mad <- function(x, y,
         which.min(deltas)
     }
 
-    breakpoint_indices <- integer(0)
+    breakpoint_indices <- NULL
     if (direction %in% c("upper", "both")) {
         i_up <- find_closest_idx(up_thresh)
         breakpoint_indices <- c(breakpoint_indices, i_up)

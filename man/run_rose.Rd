@@ -29,7 +29,6 @@ run_rose(
   floor = 1,
   read.ext = 200,
   normalize.by.width = FALSE,
-  drop.zeros = FALSE,
   annotate = TRUE,
   annotate.dist = 50000,
   promoter.dist = c(2000, 200),
@@ -73,7 +72,8 @@ Default is 50. Ignored if \code{txdb} is \code{NULL}.}
 Default is \code{TRUE}.}
 
 \item{drop.no.signal}{Logical indicating whether to remove regions with negative or zero values in the ranking signal.
-Default is \code{FALSE}.}
+Default is \code{FALSE}.
+This is done prior to any transformation.}
 
 \item{thresh.method}{Character string specifying the method to determine the signal threshold.
 Must be one of "ROSE", "first", "second_diff", "segmented", "chord", "curvature", "mad", or "arbitrary".
@@ -120,9 +120,6 @@ Default is 200. Ignored if inputs are \code{GRanges} objects.}
 
 \item{normalize.by.width}{Logical indicating whether to normalize signal by region width.
 ROSE does this, but then undoes it at a later step, so \code{FALSE} is the default.}
-
-\item{drop.zeros}{Logical indicating whether to drop regions with zero signal.
-Default is \code{FALSE}.}
 
 \item{annotate}{Logical indicating whether annotations should be provided.
 Default is \code{TRUE}.}

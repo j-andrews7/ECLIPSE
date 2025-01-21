@@ -26,7 +26,6 @@ Imports:
     genomation,
     GenomicRanges,
     graphics,
-    HelloRanges,
     IRanges,
     Rsamtools,
     rtracklayer,
@@ -37,7 +36,9 @@ Imports:
     Gviz,
     csaw,
     stringi,
-    data.table
+    data.table,
+    MASS,
+    ggplot2
 Suggests:
     BiocStyle,
     knitr,
@@ -48,7 +49,9 @@ Suggests:
     org.Hs.eg.db,
     DESeq2,
     apeglm,
-    segmented
+    segmented,
+    ggrastr,
+    plotly
 Depends:
     R (>= 4.4.0)
 biocViews: 
