@@ -682,7 +682,7 @@ dev.off()
 ## Re-running with Different Parameters
 
 If already run, one can re-run `run_rose` without performing stitching, re-calculating coverage, and annotating, which is much faster.
-Simply set `force = FALSE` in the `run_rose` call and regigon stitching, coverage calculation, and annotation will be skipped.
+Simply set `force = FALSE` in the `run_rose` call and those steps will be skipped.
 This allows one to test different transformations or thresholding methods very quickly.
 
 ```{r}
@@ -698,10 +698,35 @@ Runs almost instantly, huzzah.
 
 ## Differential Sub-Structural Analysis
 
-ECLIPSE also provides functionality to identify sub-structural changes within super enhancer regions between groups via differential analysis of small bins.
+**ECLIPSE** provides a way to compare signal in SEs between groups at a high resolution via small bins to identify sub-structural SE changes.
+
+Often, when super enhancers are compared, binary overlaps or intersects are used to define "specific" super enhancers for a given lineage or condition.
+
+But this ignore alterations within SEs that overlap between groups.
+For more involved studies, one might go back to the constituent peaks to compare high signal regions within SEs, but this process is still subject to many of the same issues as peak calling in general.
+
+This is where differential sub-structural analysis comes in.
+We try to maintain simplicity while increasing robustness and flexibility.
 
 For this example, we'll compare naive B cells and activated B cells from ENCODE.
 These groups have enough similarities to demonstrate how this analysis looks for similar regions, but also enough changes in SE structure to be interesting.
+
+### Call Consensus Peaks for Each Group
+
+Peak calling can be finicky and rather variable between biological and even technical replicates.
+
+To get around this, folks tend to derive "consensus" peaksets for replicates.
+Most often, this is done through some some of merging processm sometimes requiring overlap in some arbitrary number or proportion of samples.
+
+More robust methods include the [Irreproducible Discovery Rate (IDR)](https://github.com/nboley/idr) used in the ENCODE pipelines.
+
+This process is exacerbated when trying to merge SEs across samples, particularly given the arbitrary and variable nature of the threshold point in the original ROSE implementation between replicates (another problem **ECLIPSE** aims to address).
+
+While it's possible to call SEs for each sample in a group individually and merging, it's tempting to simplify the process by defining a consensus set of peaks and combining signal for all replicates into a single BAM and calling on that.
+
+Of course, this assumes that the signal is fairly homogenous across replicates, which may not always be the case, particularly from disease states where heterogeneity is known (certain tumor types, etc).
+
+But in this case, it feels like a reasonable assumption.
 
 ### Call Activated B Cell Super Enhancers
 
@@ -718,7 +743,12 @@ control_actB1_path <- bfcrpath(bfc, control_actB1_url)
 peaks_actB1_url <- "https://www.encodeproject.org/files/ENCFF915WBP/@@download/ENCFF915WBP.bed.gz"
 peaks_actB1_path <- bfcrpath(bfc, peaks_actB1_url)
 
-actB1_enhancers <- run_rose(treatment = actB1_path, control = control_actB1_path, peaks = peaks_actB1_path)
+peaks_actB1 <- readBed(peaks_actB1_path)
+
+treat_actB1 <- BamFile(actB1_path)
+control_actB1 <- BamFile(control_actB1_path)
+
+actB1_enhancers <- run_rose(treatment = treat_actB1, control = control_actB1, peaks = peaks_actB1)
 ```
 
 Now we can merge the activated and naive B cell super enhancers.
