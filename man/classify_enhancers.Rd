@@ -41,7 +41,7 @@ Generally, unlikely to be useful for most applications.
 Default is 0.}
 
 \item{chord.threshold}{Numeric value for ignoring small differences when using the "chord" threshold method.
-May be useful for transformation that result in curves with small differences.
+May be useful for transformations that result in curves with small differences.
 Generally, unlikely to be useful for most applications.
 Default is 0.}
 

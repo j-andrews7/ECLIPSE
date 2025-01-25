@@ -588,8 +588,8 @@ classify_enhancers <- function(regions,
 #'   Must be one of "ROSE", "first", "second_diff", "segmented", "chord", "curvature", "mad", or "arbitrary".
 #'   Default is "ROSE".
 #' @param rose.slope Numeric value for the slope of the diagonal line used for the "ROSE" threshold method.
-#'  Default is `NULL`, meaning it will be calculated automatically based on the minimum and maximum signal values. 
-#' See `calculate_cutoff` for details.
+#'   Default is `NULL`, meaning it will be calculated automatically based on the minimum and maximum signal values. 
+#'   See `calculate_cutoff` for details.
 #' @param first.threshold Numeric value for the fraction of steepest slope when using the "first" threshold method.
 #'   Higher value will result in fewer SEs called.
 #'   Default is 0.5.
@@ -598,8 +598,8 @@ classify_enhancers <- function(regions,
 #'   Generally, unlikely to be useful for most applications.
 #'   Default is 0.
 #' @param chord.threshold Numeric value for ignoring small differences when using the "chord" threshold method.
-#'   May be useful for transformation that result in curves with small differences.
-#' Generally, unlikely to be useful for most applications.
+#'   May be useful for transformations that result in curves with small differences.
+#'   Generally, unlikely to be useful for most applications.
 #'   Default is 0.
 #' @param arbitrary.threshold Numeric value for the arbitrary threshold if the "arbitrary" threshold method is selected.
 #'   Useful for scaled transformations like cumulative proportion of signal.
@@ -613,7 +613,7 @@ classify_enhancers <- function(regions,
 #' @param transformation A function to apply to the ranking signal before threshold determination.
 #'   Default is `NULL`.
 #' @param floor Numeric value representing the minimum coverage threshold to count.
-#'  Default is 1.
+#'   Default is 1.
 #' @param read.ext Numeric value for extending reads downstream.
 #'   Default is 200. Ignored if inputs are `GRanges` objects.
 #' @param normalize.by.width Logical indicating whether to normalize signal by region width.
