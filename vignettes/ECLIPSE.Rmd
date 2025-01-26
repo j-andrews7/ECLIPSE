@@ -69,32 +69,42 @@ txdb <- keepStandardChromosomes(txdb, pruning.mode = "coarse")
 org.db <- org.Hs.eg.db
 
 bfc <- BiocFileCache(ask = FALSE)
-treat_url <- "https://www.encodeproject.org/files/ENCFF993DJI/@@download/ENCFF993DJI.bam"
-treat_path <- bfcrpath(bfc, treat_url)
+naiveB1_treat_url <- "https://www.encodeproject.org/files/ENCFF993DJI/@@download/ENCFF993DJI.bam"
+naiveB1_treat_path <- bfcrpath(bfc, naiveB1_treat_url)
 
-treat_bw_url <- "https://www.encodeproject.org/files/ENCFF901BFR/@@download/ENCFF901BFR.bigWig"
-treat_bw_path <- bfcrpath(bfc, treat_bw_url)
+naiveB1_treat_bw_url <- "https://www.encodeproject.org/files/ENCFF901BFR/@@download/ENCFF901BFR.bigWig"
+naiveB1_treat_bw_path <- bfcrpath(bfc, naiveB1_treat_bw_url)
 
-control_url <- "https://www.encodeproject.org/files/ENCFF821MAI/@@download/ENCFF821MAI.bam"
-control_path <- bfcrpath(bfc, control_url)
+naiveB1_control_url <- "https://www.encodeproject.org/files/ENCFF821MAI/@@download/ENCFF821MAI.bam"
+naiveB1_control_path <- bfcrpath(bfc, naiveB1_control_url)
 
-peaks_url <- "https://www.encodeproject.org/files/ENCFF590DFY/@@download/ENCFF590DFY.bed.gz"
-peaks_path <- bfcrpath(bfc, peaks_url)
+naiveB1_peaks_url <- "https://www.encodeproject.org/files/ENCFF590DFY/@@download/ENCFF590DFY.bed.gz"
+naiveB1_peaks_path <- bfcrpath(bfc, naiveB1_peaks_url)
 
-treat_bam <- BamFile(treat_path)
-control_bam <- BamFile(control_path)
-peaks <- readBed(peaks_path)
+naiveB1_treat_bam <- BamFile(naiveB1_treat_path)
+naiveB1_control_bam <- BamFile(naiveB1_control_path)
+naiveB1_peaks <- readBed(naiveB1_peaks_path)
 
-naiveB1_enhancers <- run_rose(treatment = treat_bam, control = control_bam, peaks = peaks,
-                              txdb = txdb, org.db = org.db, stitch.distance = 12500, tss.exclusion.distance = 2500,
+naiveB1_enhancers <- run_rose(treatment = naiveB1_treat_bam, 
+                              control = naiveB1_control_bam, 
+                              peaks = naiveB1_peaks,
+                              txdb = txdb, 
+                              org.db = org.db, 
+                              stitch.distance = 12500, 
+                              tss.exclusion.distance = 2500,
                               max.unique.gene.tss.overlap = 2,
                               drop.no.signal = TRUE)
 
-naiveB1_enhancers_width_normalized <- run_rose(treatment = treat_bam, control = control_bam, peaks = peaks,
-                              txdb = txdb, org.db = org.db, stitch.distance = 12500, tss.exclusion.distance = 2500,
-                              max.unique.gene.tss.overlap = 2,
-                              drop.no.signal = TRUE,
-                              normalize.by.width = TRUE)
+naiveB1_enhancers_width_normalized <- run_rose(treatment = naiveB1_treat_bam,
+                                               control = naiveB1_control_bam,
+                                               peaks = naiveB1_peaks,
+                                               txdb = txdb, 
+                                               org.db = org.db, 
+                                               stitch.distance = 12500,
+                                               tss.exclusion.distance = 2500,
+                                               max.unique.gene.tss.overlap = 2,
+                                               drop.no.signal = TRUE,
+                                               normalize.by.width = TRUE)
 ```
 
 ### Other Input Types
@@ -708,27 +718,130 @@ For more involved studies, one might go back to the constituent peaks to compare
 This is where differential sub-structural analysis comes in.
 We try to maintain simplicity while increasing robustness and flexibility.
 
-For this example, we'll compare naive B cells and activated B cells from ENCODE.
+For this example, we'll compare naive B cells and activated B cells from ENCODE, two replicates for each.
 These groups have enough similarities to demonstrate how this analysis looks for similar regions, but also enough changes in SE structure to be interesting.
+
+### Download Data
+
+```{r}
+naiveB1_treat_url <- "https://www.encodeproject.org/files/ENCFF993DJI/@@download/ENCFF993DJI.bam"
+naiveB1_treat_path <- bfcrpath(bfc, naiveB1_treat_url)
+
+naiveB1_treat_bw_url <- "https://www.encodeproject.org/files/ENCFF901BFR/@@download/ENCFF901BFR.bigWig"
+naiveB1_treat_bw_path <- bfcrpath(bfc, naiveB1_treat_bw_url)
+
+naiveB1_control_url <- "https://www.encodeproject.org/files/ENCFF821MAI/@@download/ENCFF821MAI.bam"
+naiveB1_control_path <- bfcrpath(bfc, naiveB1_control_url)
+
+naiveB1_peaks_url <- "https://www.encodeproject.org/files/ENCFF590DFY/@@download/ENCFF590DFY.bed.gz"
+naiveB1_peaks_path <- bfcrpath(bfc, naiveB1_peaks_url)
+
+naiveB1_treat_bam <- BamFile(naiveB1_treat_path)
+naiveB1_control_bam <- BamFile(naiveB1_control_path)
+naiveB1_peaks <- readBed(naiveB1_peaks_path)
+# ---
+naiveB2_treat_url <- "https://www.encodeproject.org/files/ENCFF808SRS/@@download/ENCFF808SRS.bam"
+naiveB2_treat_path <- bfcrpath(bfc, naiveB2_treat_url)
+
+naiveB2_treat_bw_url <- "https://www.encodeproject.org/files/ENCFF926THG/@@download/ENCFF926THG.bigWig"
+naiveB2_treat_bw_path <- bfcrpath(bfc, naiveB2_treat_bw_url)
+
+naiveB2_control_url <- "https://www.encodeproject.org/files/ENCFF847PCC/@@download/ENCFF847PCC.bam"
+naiveB2_control_path <- bfcrpath(bfc, naiveB2_control_url)
+
+naiveB2_peaks_url <- "https://www.encodeproject.org/files/ENCFF957BIX/@@download/ENCFF957BIX.bed.gz"
+naiveB2_peaks_path <- bfcrpath(bfc, naiveB2_peaks_url)
+
+naiveB2_treat_bam <- BamFile(naiveB2_treat_path)
+naiveB2_control_bam <- BamFile(naiveB2_control_path)
+naiveB2_peaks <- readBed(naiveB2_peaks_path)
+# ---
+actB1_treat_url <- "https://www.encodeproject.org/files/ENCFF640GBC/@@download/ENCFF640GBC.bam"
+actB1_treat_path <- bfcrpath(bfc, actB1_treat_url)
+
+actB1_control_url <- "https://www.encodeproject.org/files/ENCFF391WGD/@@download/ENCFF391WGD.bam"
+actB1_control_path <- bfcrpath(bfc, actB1_control_url)
+
+actB1_treat_bw_url <- "https://www.encodeproject.org/files/ENCFF920IQC/@@download/ENCFF920IQC.bigWig"
+actB1_treat_bw_path <- bfcrpath(bfc, actB1_treat_bw_url)
+
+actB1_peaks_url <- "https://www.encodeproject.org/files/ENCFF915WBP/@@download/ENCFF915WBP.bed.gz"
+actB1_peaks_path <- bfcrpath(bfc, actB1_peaks_url)
+
+actB1_treat_bam <- BamFile(actB1_treat_path)
+actB1_control_bam <- BamFile(actB1_control_path)
+actB1_peaks <- readBed(actB1_peaks_path)
+# ---
+actB2_treat_url <- "https://www.encodeproject.org/files/ENCFF267CCT/@@download/ENCFF267CCT.bam"
+actB2_treat_path <- bfcrpath(bfc, actB2_treat_url)
+
+actB2_control_url <- "https://www.encodeproject.org/files/ENCFF180NYR/@@download/ENCFF180NYR.bam"
+actB2_control_path <- bfcrpath(bfc, actB2_control_url)
+
+actB2_treat_bw_url <- "https://www.encodeproject.org/files/ENCFF672SYY/@@download/ENCFF672SYY.bigWig"
+actB2_treat_bw_path <- bfcrpath(bfc, actB2_treat_bw_url)
+
+actB2_peaks_url <- "https://www.encodeproject.org/files/ENCFF308AKX/@@download/ENCFF308AKX.bed.gz"
+actB2_peaks_path <- bfcrpath(bfc, actB2_peaks_url)
+
+actB2_treat_bam <- BamFile(actB2_treat_path)
+actB2_control_bam <- BamFile(actB2_control_path)
+actB2_peaks <- readBed(actB2_peaks_path)
+```
+
 
 ### Call Consensus Peaks for Each Group
 
 Peak calling can be finicky and rather variable between biological and even technical replicates.
 
 To get around this, folks tend to derive "consensus" peaksets for replicates.
-Most often, this is done through some some of merging processm sometimes requiring overlap in some arbitrary number or proportion of samples.
+Most often, this is done through some some of merging process, sometimes requiring overlap in some arbitrary number or proportion of samples.
 
 More robust methods include the [Irreproducible Discovery Rate (IDR)](https://github.com/nboley/idr) used in the ENCODE pipelines.
 
 This process is exacerbated when trying to merge SEs across samples, particularly given the arbitrary and variable nature of the threshold point in the original ROSE implementation between replicates (another problem **ECLIPSE** aims to address).
 
-While it's possible to call SEs for each sample in a group individually and merging, it's tempting to simplify the process by defining a consensus set of peaks and combining signal for all replicates into a single BAM and calling on that.
+While it's possible to call SEs for each sample in a group individually and merge them in some reasonable way, it's tempting to simplify the process by defining a consensus set of peaks and combining signal for all replicates into a single BAM and calling on that.
 
 Of course, this assumes that the signal is fairly homogenous across replicates, which may not always be the case, particularly from disease states where heterogeneity is known (certain tumor types, etc).
 
 But in this case, it feels like a reasonable assumption.
 
-### Call Activated B Cell Super Enhancers
+So to derive this consensus set, we'll use the [rmspc](https://www.bioconductor.org/packages/release/bioc/vignettes/rmspc/inst/doc/rmpsc.html) package, which takes a similar approach to IDR.
+
+```{r}
+library(rmspc)
+
+# MSPC requires a config file that designates the p-value column of your BED file. For MACS2/3, and in this case, this is the 8th column.
+# By default, the MSPC config assumes it's the 5th column, so we want to change that.
+# ECLIPSE contains a config file with the proper parameters for MACS2/3.
+config_path <- system.file("extdata", "mspc_narrowPeak.json", package = "ECLIPSE")
+
+# Vectors of naive B cell and activated B cell bed files
+naiveB_peaks <- GRangesList(naiveB1 = naiveB1_peaks, naiveB2 = naiveB2_peaks)
+actB_peaks <- GRangesList(actB1 = actB1_peaks, actB2 = actB2_peaks)
+
+naive_mspc <- mspc(
+    input = naiveB_peaks, 
+    replicateType = "Biological",
+    stringencyThreshold = 1e-8,
+    weakThreshold = 1e-4,
+    keep = FALSE,
+    inputParserConfiguration = config_path,
+    GRanges = TRUE)
+
+act_mspc <- mspc(
+    input = actB_peaks, 
+    replicateType = "Biological",
+    stringencyThreshold = 1e-8,
+    weakThreshold = 1e-4,
+    keep = FALSE,
+    inputParserConfiguration = config_path,
+    GRanges = TRUE)
+```
+
+
+### Call Super Enhancers
 
 We'll also want the SEs from activated B cells so that we have all the SE regions between the groups included for comparison.
 This is also useful for classification of SE structure changes between groups (see below).
