@@ -840,36 +840,80 @@ act_mspc <- mspc(
     GRanges = TRUE)
 ```
 
+### Generate Merged BAMs per Group
+
+To ensure equal representation of each sample in the group's signal, we'll subsample each BAM to the lowest number of reads in any sample for the group and then merge.
+
+```{r}
+library(Rsamtools)
+library(GenomicAlignments)
+library(rtracklayer)
+
+actB_bams <- c(actB1_treat_path, actB2_treat_path)
+naiveB_bams <- c(naiveB1_treat_path, naiveB2_treat_path)
+
+out_act <- "actB_merged.bam"
+out_naive <- "naiveB_merged.bam"
+
+subsample_merge_bams <- function(bams, n = NULL) {
+
+    tots <- lapply(bams, function(x) countBam(x)$records)
+    
+    if (is.null(n)) {
+        n <- min(unlist(tots))
+        message("Subsampling each sample to roughly ", n, " reads")
+    }
+    
+    fracs <- lapply(tots, function(x) n/x)
+    
+    out <- list()
+    for (i in seq_along(bams)) {
+        bf <- BamFile(bams[i], yieldSize = 1e5)  # read in chunks of 100k reads
+        open(bf)
+        on.exit(close(bf))
+    
+        while (TRUE) {
+            ga <- readGAlignments(bf, use.names = TRUE)  # get chunk
+            if (length(ga) == 0) break
+            keep    <- rbinom(length(ga), 1, fracs[[i]]) == 1  # random Bernoulli
+            out[[length(out) + 1]] <- ga[keep]
+        }
+    }
+    
+    do.call(c, unlist(out))
+}
+
+actB_sub <- subsample_merge_bams(actB_bams)
+export(actB_sub, out_act, format = "BAM")
+
+naiveB_sub <- subsample_merge_bams(naiveB_bams)
+export(naiveB_sub, out_naive, format = "BAM")
+```
+
 
 ### Call Super Enhancers
 
-We'll also want the SEs from activated B cells so that we have all the SE regions between the groups included for comparison.
-This is also useful for classification of SE structure changes between groups (see below).
+Now we can call SEs for each group using the merged BAMs and consensus peaks.
 
 ```{r}
-actB1_url <- "https://www.encodeproject.org/files/ENCFF640GBC/@@download/ENCFF640GBC.bam"
-actB1_path <- bfcrpath(bfc, actB1_url)
+naiveB_merge <- BamFile(out_naive)
+actB_merge <- BamFile(out_act)
 
-control_actB1_url <- "https://www.encodeproject.org/files/ENCFF391WGD/@@download/ENCFF391WGD.bam"
-control_actB1_path <- bfcrpath(bfc, control_actB1_url)
+naiveB_enhancers <- run_rose(treatment = naiveB1_treat_bw_path, 
+                             control = naiveB1_control_bam, 
+                             peaks = naive_mspc$GRangesObjects$ConsensusPeaks)
 
-peaks_actB1_url <- "https://www.encodeproject.org/files/ENCFF915WBP/@@download/ENCFF915WBP.bed.gz"
-peaks_actB1_path <- bfcrpath(bfc, peaks_actB1_url)
-
-peaks_actB1 <- readBed(peaks_actB1_path)
-
-treat_actB1 <- BamFile(actB1_path)
-control_actB1 <- BamFile(control_actB1_path)
-
-actB1_enhancers <- run_rose(treatment = treat_actB1, control = control_actB1, peaks = peaks_actB1)
+actB_enhancers <- run_rose(treatment = treat_actB1, 
+                           control = control_actB1, 
+                           peaks = act_mspc$GRangesObjects$ConsensusPeaks)
 ```
 
 Now we can merge the activated and naive B cell super enhancers.
 
 ```{r}
-naiveB1_SEs <- naiveB1_enhancers[naiveB1_enhancers$super]
-actB1_SEs <- actB1_enhancers[actB1_enhancers$super]
-all_SEs <- rbind(naiveB1_SEs, actB1_SEs)
+naiveB_SEs <- naiveB_enhancers[naiveB_enhancers$super]
+actB_SEs <- actB_enhancers[actB_enhancers$super]
+all_SEs <- rbind(naiveB_SEs, actB_SEs)
 
 # Merge overlapping SEs between the groups
 all_SEs <- reduce(all_SEs)
