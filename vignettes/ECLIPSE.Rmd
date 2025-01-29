@@ -885,9 +885,11 @@ subsample_merge_bams <- function(bams, n = NULL) {
 
 actB_sub <- subsample_merge_bams(actB_bams)
 export(actB_sub, out_act, format = "BAM")
+rm(actB_sub)
 
 naiveB_sub <- subsample_merge_bams(naiveB_bams)
 export(naiveB_sub, out_naive, format = "BAM")
+rm(naiveB_sub)
 ```
 
 
@@ -899,12 +901,10 @@ Now we can call SEs for each group using the merged BAMs and consensus peaks.
 naiveB_merge <- BamFile(out_naive)
 actB_merge <- BamFile(out_act)
 
-naiveB_enhancers <- run_rose(treatment = naiveB1_treat_bw_path, 
-                             control = naiveB1_control_bam, 
+naiveB_enhancers <- run_rose(treatment = naiveB_merge,
                              peaks = naive_mspc$GRangesObjects$ConsensusPeaks)
 
-actB_enhancers <- run_rose(treatment = treat_actB1, 
-                           control = control_actB1, 
+actB_enhancers <- run_rose(treatment = actB_merge,
                            peaks = act_mspc$GRangesObjects$ConsensusPeaks)
 ```
 
@@ -920,20 +920,6 @@ all_SEs <- reduce(all_SEs)
 
 # Add a REGION_ID column to keep track of which bins came from which SEs for differential analysis.
 mcols(all_SEs)$REGION_ID <- seq_along(all_SEs)
-```
-
-
-### Loading Additional Replicates
-
-Now we need signal counts for additional replicates in each group.
-Note that we could call SEs from each sample individually before merging, or use more complicated strategies to derive SEs to compare, e.g. overlap in some proportion of samples.
-
-```{r}
-naiveB2_url <- "https://www.encodeproject.org/files/ENCFF808SRS/@@download/ENCFF808SRS.bam"
-naiveB2_path <- bfcrpath(bfc, naiveB2_url)
-
-actB2_url <- "https://www.encodeproject.org/files/ENCFF267CCT/@@download/ENCFF267CCT.bam"
-actB2_path <- bfcrpath(bfc, actB2_url)
 ```
 
 ### Differential Analysis
