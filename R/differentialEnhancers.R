@@ -217,7 +217,7 @@ differentialEnhancers <- function(se.1, se.2, bam.files, conditions,
 
     fit <- glmQLFit(y, design, robust = TRUE)
 
-    message("Performing quasi-likelihood F-Test using levels: ", paste(levels(conditions)))
+    message("Performing quasi-likelihood F-Test using levels: ", paste(levels(conditions), collapse = " "))
 
     results <- glmQLFTest(fit, coef = "Condition")
 
@@ -241,8 +241,8 @@ differentialEnhancers <- function(se.1, se.2, bam.files, conditions,
     merged.regions <- merged.results$regions
     mcols(merged.regions) <- DataFrame(merged.combined)
 
-    # report regions that have FDR < 0.05
-    sig <- table(merged.regions$FDR < 0.05)[2]
+    # report regions that have FDR <= 0.05
+    sig <- table(merged.regions$FDR <= 0.05)[2]
     total <- length(merged.regions$FDR)
     sig.pct <- round((sig/total)*100,2)
     message("Summary: ", sig, " of ", total, " merged regions (", sig.pct, "%) have an FDR <= 0.05.")
