@@ -71,7 +71,8 @@
 #'
 differentialEnhancers <- function(se.1, se.2, bam.files, conditions,
                                window.size = 150, window.spacing = 50,
-                               # restrict = NULL, discard = NULL, # to exclude regions for
+                               # optional args to readParam for restricting chromosomes or excluding intervals
+                               # restrict = NULL, discard = NULL,
                                paired = NULL, read.length = NULL, quality = 20,
                                bg.bin.width = 2000, bg.fc = 10,
                                merged.adj.width = 450, merged.max.width = 2000,
