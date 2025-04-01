@@ -805,7 +805,7 @@ run_rose <- function(
         segmented.breakpoints = segmented.breakpoints
     )
 
-    if (annotate & force) {
+    if (annotate & !force) {
         if (!is.null(txdb) & !is.null(org.db)) {
             message("Annotating regions")
             regions <- annotate_enhancers(regions, peaks,
