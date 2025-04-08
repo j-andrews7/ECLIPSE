@@ -35,7 +35,8 @@ run_rose(
   active.genes = NULL,
   identify.active.genes = FALSE,
   omit.unknown = TRUE,
-  force = FALSE
+  force = FALSE,
+  debug = FALSE
 )
 }
 \arguments{
@@ -148,6 +149,9 @@ Default is \code{TRUE}.}
 
 \item{force}{Logical indicating whether to force recalculation of coverage and stitching even if \code{sample_signal} is found.
 Default is \code{TRUE}.}
+
+\item{debug}{Logical indicating whether to print debugging information and return a named list of
+intermediate results along with final results.}
 }
 \value{
 A \code{GRanges} object containing the classified regions and associated metadata of each,

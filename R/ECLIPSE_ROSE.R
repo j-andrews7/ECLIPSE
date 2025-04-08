@@ -638,6 +638,8 @@ classify_enhancers <- function(regions,
 #'   Default is `TRUE`.
 #' @param force Logical indicating whether to force recalculation of coverage and stitching even if `sample_signal` is found.
 #'   Default is `TRUE`.
+#' @param debug Logical indicating whether to print debugging information and return a named list of
+#'   intermediate results along with final results.
 #'
 #' @return A `GRanges` object containing the classified regions and associated metadata of each,
 #'   including super enhancer status.
@@ -689,23 +691,31 @@ run_rose <- function(
     active.genes = NULL,
     identify.active.genes = FALSE,
     omit.unknown = TRUE,
-    force = FALSE) {
-    # Check that treatment is a BamFile or GRanges object
+    force = FALSE,
+    debug = FALSE) {
+
+    if (debug) {
+        message("Debugging mode enabled. Intermediate results will be returned.")
+        og_peaks <- NULL
+        og_peaks_no_tss <- NULL
+        regions_stitched <- NULL
+        regions_unstitched <- NULL
+        regions_final <- NULL
+    }
+
+    # Check valid parameters
     if (!is.null(treatment) && !is(treatment, "BamFile") && !is(treatment, "GRanges")) {
         stop("treatment must be a BamFile or GRanges object")
     }
 
-    # Check that control is a BamFile or GRanges object
     if (!is.null(control) && !is(control, "BamFile") && !is(control, "GRanges")) {
         stop("control must be a BamFile or GRanges object")
     }
 
-    # Check that peaks is a GRanges object
     if (!is(peaks, "GRanges")) {
         stop("peaks must be a GRanges object")
     }
 
-    # Check that thresh.method is valid
     if (!thresh.method %in% c("ROSE", "first", "second_diff", "curvature", "segmented", "chord", "mad", "arbitrary")) {
         stop("thresh.method must be one of 'ROSE', 'first', 'second_diff', 'curvature', 'segmented', 'chord', 'mad', or 'arbitrary'")
     }
@@ -729,6 +739,9 @@ run_rose <- function(
     }
 
     message(length(peaks), " peaks provided")
+    if (debug) {
+        og_peaks <- peaks
+    }
 
     if (!force && !is.null(peaks$sample_signal)) {
         message("sample_signal found in peaks and force is FALSE, skipping region stitching, calculating coverage, and annotation")
@@ -749,6 +762,7 @@ run_rose <- function(
 
             message(length(unique(contained_indices)), " peaks fully contained within TSS exclusion window and will be excluded from stitching")
             peaks <- peaks[-unique(contained_indices)]
+            og_peaks_no_tss <- peaks
         }
 
         message("Stitching peaks with stitch distance of ", stitch.distance)
@@ -759,6 +773,10 @@ run_rose <- function(
             peaks.chr <- as.vector(seqnames(peaks_stitched))
             message("Dropped ", length(which(peaks.chr == "chrY")), " peaks on chrY")
             peaks_stitched <- peaks_stitched[peaks.chr != "chrY"]
+        }
+
+        if (debug) {
+            regions_stitched <- peaks_stitched
         }
 
         if (!is.null(max.unique.gene.tss.overlap)) {
@@ -772,6 +790,10 @@ run_rose <- function(
             peaks_stitched <- unstitched$regions
             hits <- unstitched$hits
             message("Unstitched ", sum(hits$unstitch), " regions")
+
+            if (debug) {
+                regions_unstitched <- peaks_stitched
+            }
         }
 
         # Drop all mcols to clean up output and avoid carrying along anything from the original peaks.
@@ -818,5 +840,17 @@ run_rose <- function(
         }
     }
 
-    regions
+    if (debug) {
+        out <- list(
+            og_peaks = og_peaks,
+            og_peaks_no_tss = og_peaks_no_tss,
+            regions_stitched = regions_stitched,
+            regions_unstitched = regions_unstitched,
+            regions_final = regions
+        )
+    } else {
+        out <- regions
+    }
+
+    out
 }
