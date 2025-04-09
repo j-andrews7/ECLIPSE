@@ -78,17 +78,15 @@ extend_reads <- function(regions, upstream = 0, downstream = 0) {
 #'     ranges = IRanges(
 #'         start = c(100, 300, 500),
 #'         end = c(200, 400, 600)
-#'     ),
-#'     strand = c("+", "-", "+")
+#'     )
 #' )
 #'
 #' original <- GRanges(
-#'     seqnames = c("chr1", "chr1", "chr2", "chr2"),
+#'     seqnames = c("chr1", "chr1", "chr2", "chr2", "chr2"),
 #'     ranges = IRanges(
-#'         start = c(100, 150, 300, 500),
-#'         end = c(150, 200, 350, 550)
-#'     ),
-#'     strand = c("+", "+", "-", "+")
+#'         start = c(100, 150, 300, 375, 500),
+#'         end = c(150, 200, 350, 400, 550)
+#'     )
 #' )
 #'
 #' tss <- GRanges(
@@ -574,6 +572,9 @@ classify_enhancers <- function(regions,
 #'   Default is `NULL`.
 #' @param drop.y Logical indicating whether to drop peaks on chromosome Y, as done by the original ROSE implementation.
 #'   Default is `TRUE`.
+#' @param keep.only.standard Logical indicating whether to keep only standard chromosomes (1-22, X, Y, M).
+#'   Helps to avoid warnings from mismatched `seqlevels` between `peaks` and `txdb`.
+#'   Default is `TRUE`.
 #' @param max.unique.gene.tss.overlap Maximum number of unique genes that a region can overlap the TSS of before being unstitched.
 #'   Note that multiple overlapping regions from the same gene, e.g. multiple isoforms, are counted as one.
 #'   Default is `NULL`. Ignored if `txdb` is `NULL`.
@@ -636,7 +637,8 @@ classify_enhancers <- function(regions,
 #' @param omit.unknown Logical indicating whether uncharacterized genes (i.e., gene symbols starting with *LOC*)
 #'   should be excluded from annotations.
 #'   Default is `TRUE`.
-#' @param force Logical indicating whether to force recalculation of coverage and stitching even if `sample_signal` is found.
+#' @param force Logical indicating whether to force recalculation of coverage, peak stitching, and annotation
+#'   even if `sample_signal` is found in the `peaks` object.
 #'   Default is `TRUE`.
 #' @param debug Logical indicating whether to print debugging information and return a named list of
 #'   intermediate results along with final results.
@@ -651,6 +653,7 @@ classify_enhancers <- function(regions,
 #' @importFrom GenomicRanges reduce seqnames trim
 #' @importFrom S4Vectors queryHits subjectHits
 #' @importFrom IRanges findOverlaps pintersect width
+#' @importFrom GenomeInfoDb keepStandardChromosomes
 #'
 #' @export
 #'
@@ -669,6 +672,7 @@ run_rose <- function(
     txdb = NULL,
     org.db = NULL,
     drop.y = TRUE,
+    keep.only.standard = TRUE,
     max.unique.gene.tss.overlap = NULL,
     tss.overlap.distance = 50,
     negative.to.zero = TRUE,
@@ -743,8 +747,13 @@ run_rose <- function(
         og_peaks <- peaks
     }
 
+    if (keep.only.standard) {
+        message("Dropping non-standard chromosomes.")
+        peaks <- keepStandardChromosomes(peaks, pruning.mode = "coarse")
+    }
+
     if (!force && !is.null(peaks$sample_signal)) {
-        message("sample_signal found in peaks and force is FALSE, skipping region stitching, calculating coverage, and annotation")
+        message("sample_signal found in peaks and force is FALSE, skipping region stitching, coverage calculation, and annotation")
         regions <- peaks
     } else {
         if (tss.exclusion.distance > 0) {
@@ -755,7 +764,7 @@ run_rose <- function(
             message("Excluding peaks within TSS exclusion distance of ", tss.exclusion.distance)
             tss <- promoters(txdb, upstream = tss.exclusion.distance, downstream = tss.exclusion.distance, columns = "GENEID")
 
-            # Create susbset of stitched peaks that do not overlap TSS and remove
+            # Create subset of stitched peaks that do not overlap TSS and remove
             overlaps <- findOverlaps(peaks, tss, type = "within")
 
             contained_indices <- queryHits(overlaps)

@@ -13,6 +13,7 @@ run_rose(
   txdb = NULL,
   org.db = NULL,
   drop.y = TRUE,
+  keep.only.standard = TRUE,
   max.unique.gene.tss.overlap = NULL,
   tss.overlap.distance = 50,
   negative.to.zero = TRUE,
@@ -61,6 +62,10 @@ regions spanning TSSes from more than \code{max.unique.gene.tss.overlap} genes. 
 Default is \code{NULL}.}
 
 \item{drop.y}{Logical indicating whether to drop peaks on chromosome Y, as done by the original ROSE implementation.
+Default is \code{TRUE}.}
+
+\item{keep.only.standard}{Logical indicating whether to keep only standard chromosomes (1-22, X, Y, M).
+Helps to avoid warnings from mismatched \code{seqlevels} between \code{peaks} and \code{txdb}.
 Default is \code{TRUE}.}
 
 \item{max.unique.gene.tss.overlap}{Maximum number of unique genes that a region can overlap the TSS of before being unstitched.
@@ -147,7 +152,8 @@ Default is \code{FALSE}.}
 should be excluded from annotations.
 Default is \code{TRUE}.}
 
-\item{force}{Logical indicating whether to force recalculation of coverage and stitching even if \code{sample_signal} is found.
+\item{force}{Logical indicating whether to force recalculation of coverage, peak stitching, and annotation
+even if \code{sample_signal} is found in the \code{peaks} object.
 Default is \code{TRUE}.}
 
 \item{debug}{Logical indicating whether to print debugging information and return a named list of
