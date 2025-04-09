@@ -15,9 +15,9 @@ differentialEnhancers(
   read.length = NULL,
   quality = 20,
   bg.bin.width = 2000,
-  bg.fc = 10,
-  merged.adj.width = 450,
-  merged.max.width = 2000,
+  bg.fc = 3,
+  merged.adj.width = 100,
+  merged.max.width = 50000,
   bpparam = SerialParam(),
   debug = FALSE
 )
@@ -51,14 +51,14 @@ Default is \code{20}.}
 Default is \code{2000}.}
 
 \item{bg.fc}{A numeric specifying the minimum fold change above background abundance required to keep windows.
-Default is \code{10}.}
+Default is \code{3}.}
 
 \item{merged.adj.width}{An integer specifying the maximum distance between adjacent windows.
 Adjacent windows within this distance will be merged.
-Default is \code{450}.}
+Default is \code{100}.}
 
 \item{merged.max.width}{An integer specifying the maximum width (bp) of merged windows.
-Default is \code{2000}}
+Default is \code{50000}}
 
 \item{bpparam}{A \linkS4class{BiocParallelParam} specifying parallelization strategy.
 Default is \linkS4class{SerialParam}.}

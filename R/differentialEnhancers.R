@@ -36,12 +36,12 @@
 #' @param bg.bin.width An integer specifying the bin width (bp) to calculate background abundance.
 #'  Default is `2000`.
 #' @param bg.fc A numeric specifying the minimum fold change above background abundance required to keep windows.
-#'  Default is `10`.
+#'  Default is `3`.
 #' @param merged.adj.width An integer specifying the maximum distance between adjacent windows.
 #'  Adjacent windows within this distance will be merged.
-#'  Default is `450`.
+#'  Default is `100`.
 #' @param merged.max.width An integer specifying the maximum width (bp) of merged windows.
-#'  Default is `2000`
+#'  Default is `50000`
 #' @param bpparam A \linkS4class{BiocParallelParam} specifying parallelization strategy.
 #'  Default is \linkS4class{SerialParam}.
 #' @param debug Boolean specifying whether to return a list of intermediate objects for key analysis steps.
@@ -74,8 +74,8 @@ differentialEnhancers <- function(se.1, se.2, bam.files, conditions,
                                # optional args to readParam for restricting chromosomes or excluding intervals
                                # restrict = NULL, discard = NULL,
                                paired = NULL, read.length = NULL, quality = 20,
-                               bg.bin.width = 2000, bg.fc = 10,
-                               merged.adj.width = 450, merged.max.width = 2000,
+                               bg.bin.width = 2000, bg.fc = 3,
+                               merged.adj.width = 100, merged.max.width = 50000,
                                bpparam = SerialParam(),
                                debug = FALSE) {
 
@@ -248,11 +248,13 @@ differentialEnhancers <- function(se.1, se.2, bam.files, conditions,
     sig.pct <- round((sig/total)*100,2)
     message("Summary: ", sig, " of ", total, " merged regions (", sig.pct, "%) have an FDR <= 0.05.")
 
-if (debug == TRUE) {
-    return(
-        list(se.windows, se.window.counts, filtered.by.global, merged.results, merged.regions))
-    }
-else { return(merged.regions) }
+    if (debug == TRUE) {
+        return(
+            list(se.windows, se.window.counts, filtered.by.global, merged.results, merged.regions))
+        }
+    else { 
+        return(merged.regions) 
+        }
 }
 
 

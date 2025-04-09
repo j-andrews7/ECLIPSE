@@ -51,17 +51,15 @@ stitched <- GRanges(
     ranges = IRanges(
         start = c(100, 300, 500),
         end = c(200, 400, 600)
-    ),
-    strand = c("+", "-", "+")
+    )
 )
 
 original <- GRanges(
-    seqnames = c("chr1", "chr1", "chr2", "chr2"),
+    seqnames = c("chr1", "chr1", "chr2", "chr2", "chr2"),
     ranges = IRanges(
-        start = c(100, 150, 300, 500),
-        end = c(150, 200, 350, 550)
-    ),
-    strand = c("+", "+", "-", "+")
+        start = c(100, 150, 300, 375, 500),
+        end = c(150, 200, 350, 400, 550)
+    )
 )
 
 tss <- GRanges(
