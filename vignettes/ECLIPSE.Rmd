@@ -59,10 +59,10 @@ library(ECLIPSE)
 library(BiocFileCache)
 
 # For annotation
-library(TxDb.Hsapiens.UCSC.hg38.knownGene)
+library(TxDb.Hsapiens.UCSC.hg38.refGene)
 library(org.Hs.eg.db)
 
-txdb <- TxDb.Hsapiens.UCSC.hg38.knownGene
+txdb <- TxDb.Hsapiens.UCSC.hg38.refGene
 
 # Limit to canonical chromosomes, out of bound warnings will abound if not done
 txdb <- keepStandardChromosomes(txdb, pruning.mode = "coarse")
@@ -897,15 +897,21 @@ rm(naiveB_sub)
 
 Now we can call SEs for each group using the merged BAMs and consensus peaks.
 
+We find H3K27ac peaks at promoters to be more broad than is typically fully captured by the standard 2kb window, so we set the `tss.exclusion.distance` parameter to 3.5kb.
+
 ```{r}
 naiveB_merge <- BamFile(out_naive)
 actB_merge <- BamFile(out_act)
 
 naiveB_enhancers <- run_rose(treatment = naiveB_merge,
-                             peaks = naive_mspc$GRangesObjects$ConsensusPeaks)
+                             peaks = naive_mspc$GRangesObjects$ConsensusPeaks,
+                             tss.exclusion.distance = 3500,
+                             txdb = txdb)
 
 actB_enhancers <- run_rose(treatment = actB_merge,
-                           peaks = act_mspc$GRangesObjects$ConsensusPeaks)
+                           peaks = act_mspc$GRangesObjects$ConsensusPeaks,
+                           tss.exclusion.distance = 3500,
+                           txdb = txdb)
 ```
 
 Now we can merge the activated and naive B cell super enhancers.
@@ -913,7 +919,7 @@ Now we can merge the activated and naive B cell super enhancers.
 ```{r}
 naiveB_SEs <- naiveB_enhancers[naiveB_enhancers$super]
 actB_SEs <- actB_enhancers[actB_enhancers$super]
-all_SEs <- rbind(naiveB_SEs, actB_SEs)
+all_SEs <- unlist(as(list(naiveB_SEs, actB_SEs), "GRangesList"))
 
 # Merge overlapping SEs between the groups
 all_SEs <- reduce(all_SEs)
@@ -922,7 +928,44 @@ all_SEs <- reduce(all_SEs)
 mcols(all_SEs)$REGION_ID <- seq_along(all_SEs)
 ```
 
-### Differential Analysis
+## Differential Analysis via csaw
+
+`find_differential()` will take these merged SE regions, the BAMs, perform the following steps:
+
+The analysis proceeds through the following steps:
+
+ 1. Regions are segmented into sliding windows.
+ 2. Reads from BAM files are counted in each window.
+ 3. Windows with low read counts relative to background are filtered out.
+ 4. Normalization is performed to account for trended bias.
+ 5. Dispersion is modeled using a negative binomial generalized linear
+   model with quasi-likelihood (QL).
+ 6. Differential analysis is performed using a QL F-test to
+   assign statistical significance to each window.
+ 7. Windows are merged into regions based on proximity, and test statistics
+   from individual windows are combined.
+ 8. Differential analysis statistics are added to the metadata of merged regions.
+ 
+```{r}
+act_v_naive <- find_differential(
+    regions = all_SEs,
+    g1.bam.files = actB_bams,
+    g2.bam.files = naiveB_bams,
+    g1.name = "ActivatedB",
+    g2.name = "NaiveB",
+    paired = FALSE,
+    fragment.length = 200,
+    bg.fc = 3,
+    merged.max.width = 50000
+)
+```
+
+Note we could also run this on all regions rather than just the super enhancers.
+`bg.fc` is the fold-change above background a window must have to be retained - 
+we find 3 is a reasonable starting point, but can be adjusted to be more/less stringent.
+
+
+## Differential Analysis via DESeq2
 
 Now we can actually do our differential analysis.
 This will compose of:

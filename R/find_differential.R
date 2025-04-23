@@ -22,8 +22,12 @@
 #'
 #' @param regions A `GRanges` object of regions to compare between conditions.
 #'   These regions will be reduced, i.e. overlapping regions will be merged to one.
-#' @param bam.files A character vector of BAM file paths that correspond to each sample.
-#' @param conditions A character or factor vector indicating the experimental condition for *each* BAM file.
+#' @param g1.bam.files A character vector of BAM file paths for group 1.
+#' @param g2.bam.files A character vector of BAM file paths for group 2.
+#' @param g1.name A character string specifying the name of group 1.
+#'   Default is "group1".
+#' @param g2.name A character string specifying the name of group 2.
+#'   Default is "group2".
 #' @param window.size An integer specifying the window width (bp).
 #'   Default is `150`.
 #' @param window.spacing An integer specifying the distance (bp) between windows.
@@ -59,6 +63,7 @@
 #'   filterWindowsGlobal normOffsets asDGEList mergeResults reform
 #' @importFrom edgeR estimateDisp glmQLFit glmQLFTest
 #' @importFrom BiocParallel SerialParam
+#' @importFrom Rsamtools indexBam
 #'
 #' @export
 #'
@@ -67,13 +72,14 @@
 #' @examples
 #' \dontrun{
 #' significant.regions <- find_differential(regions = my.granges,
-#'                                          bam.files = my.bam,
-#'                                          conditions = ("ctrl", "ctrl", "drug", "drug")
+#'                                          g1.bam.files = my.bam1,
+#'                                          g2.bam.files = my.bam2
 #' )
 #' }
 #'
 find_differential <- function(regions, g1.bam.files, g2.bam.files,
-                              g1.name, g2.name,
+                              g1.name = "group1",
+                              g2.name = "group2",
                               window.size = 150,
                               window.spacing = 50,
                                # optional args to readParam for restricting chromosomes or excluding intervals
@@ -98,7 +104,22 @@ find_differential <- function(regions, g1.bam.files, g2.bam.files,
 
     # Check if bam.files is a character vector or BamFile object
     if (!is.character(bams) && !inherits(bams, "BamFile")) {
-        stop("`bam.files` must be a character vector of file paths or list of BamFile objects.")
+        stop("`bams` must be a character vector of file paths or list of BamFile objects.")
+    }
+
+    # Create bam indexes if they don't exist
+    for (i in seq_along(bams)) {
+        if (is.character(bams[i])) {
+            if (!file.exists(paste0(bams[i], ".bai"))) {
+                message(paste0("BAM index for ", bams[i], " does not exist, creating."))
+                indexBam(bams[i])
+            }
+        } else if (is(bams[i], "BamFile")) {
+            if (length(bams[i]$index) == 0 || !file.exists(bams[i]$index)) {
+                message(paste0("BAM index for ", bams[i], " not found. Generating an index."))
+                bams[i]$index <- unname(indexBam(bams[i]))
+            }
+        }
     }
 
     conditions <- c(rep(g1.name, length(g1.bam.files)),
@@ -137,7 +158,7 @@ find_differential <- function(regions, g1.bam.files, g2.bam.files,
     my_param <- readParam(minq = quality, dedup = FALSE)
 
     my_args <- list(
-        bam.files = bam.files,
+        bam.files = bams,
         regions = region_windows,
         param = my_param,
         BPPARAM = BPPARAM
@@ -152,7 +173,7 @@ find_differential <- function(regions, g1.bam.files, g2.bam.files,
         # Define the fragment length
         if(is.null(fragment.length)) {
             message("Approximating the fragment length...")
-            ccf <- correlateReads(bam.files, param = my_param, max.dist = 500, BPPARAM = BPPARAM) # slow
+            ccf <- correlateReads(bams, param = my_param, max.dist = 500, BPPARAM = BPPARAM) # slow
             fragment.length <- maximizeCcf(ccf)
         }
         message(paste0("Fragment length set at ", fragment.length, " bp."))
@@ -171,7 +192,7 @@ find_differential <- function(regions, g1.bam.files, g2.bam.files,
     message("Calculating background abundance using ", bg.bin.width, " bp bins...")
     time1 <- Sys.time()
 
-    bg_bins <- windowCounts(bam.files, bin = TRUE, width = bg.bin.width, param = my_param, BPPARAM = BPPARAM)
+    bg_bins <- windowCounts(bams, bin = TRUE, width = bg.bin.width, param = my_param, BPPARAM = BPPARAM)
     time2 <- Sys.time()
     message(paste0("Time elapsed: ", (time2 - time1)))
 

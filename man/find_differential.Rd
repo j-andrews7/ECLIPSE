@@ -8,8 +8,8 @@ find_differential(
   regions,
   g1.bam.files,
   g2.bam.files,
-  g1.name,
-  g2.name,
+  g1.name = "group1",
+  g2.name = "group2",
   window.size = 150,
   window.spacing = 50,
   paired = FALSE,
@@ -26,6 +26,16 @@ find_differential(
 \arguments{
 \item{regions}{A \code{GRanges} object of regions to compare between conditions.
 These regions will be reduced, i.e. overlapping regions will be merged to one.}
+
+\item{g1.bam.files}{A character vector of BAM file paths for group 1.}
+
+\item{g2.bam.files}{A character vector of BAM file paths for group 2.}
+
+\item{g1.name}{A character string specifying the name of group 1.
+Default is "group1".}
+
+\item{g2.name}{A character string specifying the name of group 2.
+Default is "group2".}
 
 \item{window.size}{An integer specifying the window width (bp).
 Default is \code{150}.}
@@ -63,10 +73,6 @@ Default is \linkS4class{SerialParam}.}
 
 \item{debug}{Boolean specifying whether to return a list of intermediate objects for key analysis steps.
 Default is \code{FALSE}.}
-
-\item{bam.files}{A character vector of BAM file paths that correspond to each sample.}
-
-\item{conditions}{A character or factor vector indicating the experimental condition for \emph{each} BAM file.}
 }
 \value{
 A \code{GRanges} object containing regions with associated
@@ -98,8 +104,8 @@ from individual windows are combined.
 \examples{
 \dontrun{
 significant.regions <- find_differential(regions = my.granges,
-                                         bam.files = my.bam,
-                                         conditions = ("ctrl", "ctrl", "drug", "drug")
+                                         g1.bam.files = my.bam1,
+                                         g2.bam.files = my.bam2
 )
 }
 
