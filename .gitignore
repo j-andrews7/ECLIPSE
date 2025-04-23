@@ -6,3 +6,4 @@ INTERNAL_*
 *.Rproj
 *.html
 *.pdf
+*.lintr

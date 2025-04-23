@@ -30,6 +30,9 @@ Currently, the package can be installed from GitHub:
 ```
 library(devtools)
 devtools::install_github("stjude-biohackathon/ECLIPSE")
+
+# Or the developmental branch
+devtools::install_github("stjude-biohackathon/ECLIPSE@dev")
 ```
 
 ## Quick Start

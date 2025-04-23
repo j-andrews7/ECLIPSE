@@ -85,12 +85,12 @@ naiveB1_treat_bam <- BamFile(naiveB1_treat_path)
 naiveB1_control_bam <- BamFile(naiveB1_control_path)
 naiveB1_peaks <- readBed(naiveB1_peaks_path)
 
-naiveB1_enhancers <- run_rose(treatment = naiveB1_treat_bam, 
-                              control = naiveB1_control_bam, 
+naiveB1_enhancers <- run_rose(treatment = naiveB1_treat_bam,
+                              control = naiveB1_control_bam,
                               peaks = naiveB1_peaks,
-                              txdb = txdb, 
-                              org.db = org.db, 
-                              stitch.distance = 12500, 
+                              txdb = txdb,
+                              org.db = org.db,
+                              stitch.distance = 12500,
                               tss.exclusion.distance = 2500,
                               max.unique.gene.tss.overlap = 2,
                               drop.no.signal = TRUE)
@@ -98,8 +98,8 @@ naiveB1_enhancers <- run_rose(treatment = naiveB1_treat_bam,
 naiveB1_enhancers_width_normalized <- run_rose(treatment = naiveB1_treat_bam,
                                                control = naiveB1_control_bam,
                                                peaks = naiveB1_peaks,
-                                               txdb = txdb, 
-                                               org.db = org.db, 
+                                               txdb = txdb,
+                                               org.db = org.db,
                                                stitch.distance = 12500,
                                                tss.exclusion.distance = 2500,
                                                max.unique.gene.tss.overlap = 2,
@@ -175,16 +175,16 @@ The original implementation provides no way to alter or disable this behavior, b
 
 ```{r}
 # With TSS exclusion and unstitching, a la the original ROSE implementation
-res_tss_exl <- run_rose(treatment = treat_path, 
-                        control = control_path, 
+res_tss_exl <- run_rose(treatment = treat_path,
+                        control = control_path,
                         peaks = peaks_path,
                         txdb = txdb,
                         tss.exclusion.distance = 2500,
                         max.unique.gene.tss.overlap = 2)
 
 # With TSS exclusion but no unstitching
-res_tss_exl_no_unstitch <- run_rose(treatment = treat_path, 
-                                    control = control_path, 
+res_tss_exl_no_unstitch <- run_rose(treatment = treat_path,
+                                    control = control_path,
                                     peaks = peaks_path,
                                     txdb = txdb,
                                     tss.exclusion.distance = 2500,
@@ -228,9 +228,9 @@ Though this is a reasonable estimate for most ChIP-seq data, we can also determi
 
 ```{r}
 # Removing duplicates for this is often necessary as there tends to be an artifactual peak at a distance equal to the read length.
-dedup.param <- readParam(minq=20, dedup=TRUE)
+dedup.param <- readParam(minq = 20, dedup = TRUE)
 x <- correlateReads(treat_path, max.dist = 500, param = dedup.param)
-plot(0:500, x, type="l", ylab="CCF", xlab="Delay (bp)")
+plot(0:500, x, type = "l", ylab = "CCF", xlab = "Delay (bp)")
 ```
 
 200 bp is a reasonable estimate, but we could also use the peak of the cross-correlation function as the 
