@@ -12,6 +12,7 @@ plot_locus(
   g2.bam.files,
   genome = "hg38",
   region.track.name = "SEs",
+  region.fill = "orange",
   padding = 0.3,
   fdr.thresh = 0.05,
   fc.track.position = c("between", "above", "below"),
@@ -31,17 +32,17 @@ plot_locus(
 )
 }
 \arguments{
-\item{region.gr}{A \link[GenomicRanges:GRanges-class]{GenomicRanges::GRanges} object containing a single region to plot.}
+\item{region.gr}{\link[GenomicRanges:GRanges-class]{GenomicRanges::GRanges} object containing a single region to plot.}
 
-\item{window.gr}{A \link[GenomicRanges:GRanges-class]{GenomicRanges::GRanges} object representing merged windows with
+\item{window.gr}{\link[GenomicRanges:GRanges-class]{GenomicRanges::GRanges} object representing merged windows with
 associated statistics, as returned by \code{\link[=find_differential]{find_differential()}}.}
 
-\item{window.rse}{A \link[SummarizedExperiment:RangedSummarizedExperiment-class]{SummarizedExperiment::RangedSummarizedExperiment} object
+\item{window.rse}{\link[SummarizedExperiment:RangedSummarizedExperiment-class]{SummarizedExperiment::RangedSummarizedExperiment} object
 containing read count data and library sizes, as returned by \code{\link[=find_differential]{find_differential()}}.}
 
-\item{g1.bam.files}{A named list of BAM file paths for group 1.}
+\item{g1.bam.files}{Named list of BAM file paths for group 1.}
 
-\item{g2.bam.files}{A named list of BAM file paths for group 2.}
+\item{g2.bam.files}{Named list of BAM file paths for group 2.}
 
 \item{genome}{String specifying the genome assembly.
 This is generally expected to match the UCSC conventions for genome assemblies.
@@ -50,10 +51,12 @@ Default is "hg38".}
 \item{region.track.name}{String for the name of the region track.
 Default is "SEs".}
 
-\item{padding}{A numeric value specifying the padding around regions.
-Default is 0.3.}
+\item{padding}{Numeric value specifying the padding around regions.
+This is used to expand the region for additional context by expanding
+the region by a factor of (1 + padding).
+Default is 0.3, e.g. 30\% of the region size.}
 
-\item{fdr.thresh}{A numeric value specifying the FDR threshold for significance.
+\item{fdr.thresh}{Numeric value specifying the FDR threshold for significance.
 Default is 0.05.}
 
 \item{fc.track.position}{String specifying the position of the fold-change track
@@ -72,7 +75,7 @@ Default is "red".}
 \item{g2.fill}{String specifying the fill color for group 2 tracks.
 Default is "blue".}
 
-\item{param}{A \link[csaw:readParam]{csaw::readParam} object specifying read extraction parameters.
+\item{param}{\link[csaw:readParam]{csaw::readParam} object specifying read extraction parameters.
 Default is \code{readParam(minq = 20, dedup = FALSE)}.}
 
 \item{top.tracks}{Optional list of additional tracks to display above the main tracks.

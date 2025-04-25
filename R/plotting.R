@@ -305,6 +305,8 @@ plot_qq <- function(
 #'   Default is "hg38".
 #' @param region.track.name String for the name of the region track.
 #'   Default is "SEs".
+#' @param region.fill String specifying the fill color for the region track.
+#'   Default is "orange".
 #' @param padding Numeric value specifying the padding around regions.
 #'   This is used to expand the region for additional context by expanding
 #'   the region by a factor of (1 + padding).
@@ -371,6 +373,7 @@ plot_locus <- function(
     g2.bam.files,
     genome = "hg38",
     region.track.name = "SEs",
+    region.fill = "orange",
     padding = 0.3,
     fdr.thresh = 0.05,
     fc.track.position = c("between", "above", "below"),
@@ -397,7 +400,7 @@ plot_locus <- function(
     reg_track <- AnnotationTrack(region.gr,
         genome = genome, name = region.track.name,
         background.title = "white", col.axis = "black",
-        col.title = "black"
+        col.title = "black", fill = region.fill
     )
 
     # Get significant regions

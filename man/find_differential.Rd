@@ -103,6 +103,7 @@ The analysis proceeds through the following steps:
 model with quasi-likelihood (QL).
 \item Differential analysis is performed using a QL F-test to
 assign statistical significance to each window.
+Group 2 will be set as the reference level.
 \item Windows are merged into regions based on proximity, and test statistics
 from individual windows are combined via \code{\link[csaw:mergeResults]{csaw::mergeResults()}}.
 \item Differential analysis statistics are added to the metadata of merged regions.

@@ -16,6 +16,7 @@
 #'    model with quasi-likelihood (QL).
 #' 6. Differential analysis is performed using a QL F-test to
 #'    assign statistical significance to each window.
+#'    Group 2 will be set as the reference level.
 #' 7. Windows are merged into regions based on proximity, and test statistics
 #'    from individual windows are combined via [csaw::mergeResults()].
 #' 8. Differential analysis statistics are added to the metadata of merged regions.
@@ -132,8 +133,7 @@ find_differential <- function(regions, g1.bam.files, g2.bam.files,
     )
 
     if (!is.factor(conditions)) {
-        conditions <- factor(conditions)
-        conditions <- relevel(conditions, ref = g1.name)
+        conditions <- factor(conditions, levels = c(g2.name, g1.name))
     }
 
     # ------------ WINDOWS ------------
@@ -160,8 +160,6 @@ find_differential <- function(regions, g1.bam.files, g2.bam.files,
 
     # ------------ COUNT ------------
     # Set up parameters
-    my_param <- readParam(minq = quality, dedup = FALSE)
-
     my_args <- list(
         bam.files = bams,
         regions = region_windows,
