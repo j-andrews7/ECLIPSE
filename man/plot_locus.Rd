@@ -51,6 +51,9 @@ Default is "hg38".}
 \item{region.track.name}{String for the name of the region track.
 Default is "SEs".}
 
+\item{region.fill}{String specifying the fill color for the region track.
+Default is "orange".}
+
 \item{padding}{Numeric value specifying the padding around regions.
 This is used to expand the region for additional context by expanding
 the region by a factor of (1 + padding).
