@@ -166,17 +166,17 @@ unstitch_regions <- function(stitched, original, tss, id.col = "GENEID", thresho
 #' of ROSE as closely as possible.
 #'
 #' To detail the process for a provided `BamFile` object:
-#' - The total number of reads in the signal BAM file is calculated.
-#' - If specified, the signal reads are extended downstream by a specified number of bases (200 bp by default).
-#' - The coverage for each basepair in the regions of interest are calculated.
+#' * The total number of reads in the signal BAM file is calculated.
+#' * If specified, the signal reads are extended downstream by a specified number of bases (200 bp by default).
+#' * The coverage for each basepair in the regions of interest are calculated.
 #'     ROSE does this manually by calling samtools for each region, which is slow.
-#' - Basepairs with coverage below a specified threshold (`floor`, 1 by default) are removed.
-#' - For each region, the coverage is summed and divided by the total number of reads to get the signal.
+#' * Basepairs with coverage below a specified threshold (`floor`, 1 by default) are removed.
+#' * For each region, the coverage is summed and divided by the total number of reads to get the signal.
 #'
 #'  To detail the process for a provided `GRanges` object:
-#' - The weighted coverage for each basepair in the regions of interest are calculated using the `score` value.
-#' - Basepairs with coverage below a specified threshold (`floor`, 1 by default) are removed.
-#' - For each region, the coverage is summed and divided by the total number of reads to get the signal.
+#' * The weighted coverage for each basepair in the regions of interest are calculated using the `score` value.
+#' * Basepairs with coverage below a specified threshold (`floor`, 1 by default) are removed.
+#' * For each region, the coverage is summed and divided by the total number of reads to get the signal.
 #'
 #' @param treatment `BamFile` or `GRanges` object representing the sample signal.
 #' @param regions `GRanges` object representing genomic regions of interest.

@@ -15,6 +15,9 @@ vignette: >
   %\VignetteIndexEntry{ECLIPSE Quick Start}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
+resource_files:
+  - "images/ENCFF590DFY_Plot_points.png"
+  - "images/plot_locus_example.png"
 ---
 
 ```{r, include=FALSE}
@@ -61,6 +64,14 @@ library(BiocFileCache)
 # For annotation
 library(TxDb.Hsapiens.UCSC.hg38.refGene)
 library(org.Hs.eg.db)
+library(excluderanges)
+suppressMessages(library(AnnotationHub))
+ah <- AnnotationHub()
+query_data <- subset(ah, preparerclass == "excluderanges")
+
+hg38_blacklist <- query_data[["AH107305"]]
+hg38_blacklist <- hg38_blacklist %>% 
+  sort() %>% keepStandardChromosomes(pruning.mode = "coarse")
 
 txdb <- TxDb.Hsapiens.UCSC.hg38.refGene
 
@@ -127,8 +138,8 @@ With default parameters, `run_rose` is an attempt to closely match the results f
 For comparison's sake, here is the enhancer ranking curve from the original ROSE implementation for [H3K27ac Mint-ChIP-seq from
 naive B cells](https://www.encodeproject.org/experiments/ENCSR660EVU/) as provided by ENCODE:
 
-```{r, fig.cap="Enhancer rank plot output by original ROSE implementation.", echo=FALSE}
-knitr::include_graphics("ENCFF590DFY_Plot_points.png")
+```{r, fig.cap="Enhancer rank plot output by original ROSE implementation.", fig.align = "center", echo=FALSE}
+knitr::include_graphics("./images/ENCFF590DFY_Plot_points.png")
 ```
 
 These results are using no TSS exclusion to compare the underlying classification approach as closely as possible.
@@ -962,6 +973,9 @@ The analysis proceeds through the following steps:
  8. Differential analysis statistics are added to the metadata of merged regions.
  
 ```{r,e val = FALSE}
+param <- readParam(minq = 20, discard = hg38_blacklist, 
+                   restrict = paste0("chr", c(1:22, "X", "Y")))
+
 act_v_naive <- find_differential(
     regions = all_SEs,
     g1.bam.files = actB_bams,
@@ -971,7 +985,8 @@ act_v_naive <- find_differential(
     paired = FALSE,
     fragment.length = 200,
     bg.fc = 5,
-    merged.max.width = 50000
+    merged.max.width = 50000,
+    param = param
 )
 
 act_v_naive_res <- act_v_naive$merged_regions
@@ -1019,7 +1034,6 @@ altered regions highlighted.
 ```{r, eval = FALSE}
 top_se <- act_v_naive_res$REGION_ID[1]
 top_se_reg <- act_v_naive_res[act_v_naive_res$REGION_ID == top_se]
-top_se_reg_sig <- top_se_reg[top_se_reg$FDR < 0.05]
 
 # Get the SE region
 se_gr <- all_SEs[all_SEs$REGION_ID == top_se]
@@ -1037,150 +1051,11 @@ symbol(greg) <- symbols[gene(greg)]
 
 plot_locus(se_gr, top_se_reg, act_v_naive$filtered_window_counts,
            g1.bam.files = actB_bams, g2.bam.files = naiveB_bams,
-           top.tracks = c(gtrack, itrack, greg))
+           top.tracks = c(gtrack, itrack, greg), param = param)
 ```
 
-
-
-## Differential Analysis via DESeq2
-
-Now we can actually do our differential analysis.
-This will compose of:
-
-- Splitting each SE into 100 bp bins.
-- Counting the signal in each bin for each replicate.
-- Dropping very low signal bins.
-- Run DESeq2 with pretty standard paramaeters.
-- Apply LFC shrinkage.
-- Merge significant bins that are within 300 bp of each other.
-
-```{r}
-library(DESeq2)
-library(apeglm)
-
-# Break into bins
-se_gr_binned <- unlist(tile(all_SEs, width=100))
-mcols(se_gr_binned) <- rep(mcols(all_SEs)["REGION_ID"], elementNROWS(tile(all_SEs, width=100)))
-
-# Count reads in each bin.
-se_gr_binned_counts <- regionCounts(bam.files = c(naiveB1_path, naiveB2_path, treat_path, actB2_path), 
-                                    regions = se_gr_binned, 
-                                    ext = 200, 
-                                    param = readParam(minq = 20))
-
-se_gr_binned_counts$group <- c(rep("naive_Bcell", 2), rep("activated_Bcell", 2))
-
-# Drop very low count bins
-smallestGroupSize <- 2
-keep <- rowSums(counts(dds) >= 20) >= smallestGroupSize
-dds <- dds[keep,]
-
-dds <- DESeq(dds)
-rezzy <- results(dds, contrast = c("group", "naive_Bcell", "activated_Bcell"), alpha = 0.05, lfcThreshold = log2(1.25))
-res <- lfcShrink(dds, res = rezzy, coef = c("group_naive_Bcell_vs_activated_Bcell"), type = "apeglm", format = "GRanges", saveCols = "REGION_ID")
-```
-
-### Rank SEs by Number of Significant Bins Altered
-
-To get an idea of which SEs may be affected.
-
-```{r}
-sig <- res[res$padj < 0.05 & !is.na(res$padj),]
-
-# Get table of bins altered in each REGION_ID, ranked by count
-db.ses <- as.data.frame(sig) %>% group_by(REGION_ID) %>% summarise(n = n()) %>% arrange(desc(n))
-
-# To se_gr, add columns for number of sig bins based on matching REGION_ID
-# Get db SE IDs
-db.ids <- se_gr$REGION_ID %in% db.ses$REGION_ID
-
-se_gr$NUM_ALTERED_BINS <- 0
-se_gr$NUM_ALTERED_BINS[db.ids] <- db.ses$n[match(se_gr$REGION_ID[db.ids], db.ses$REGION_ID)]
-```
-
-### Merge Adjacent/Nearby Bins for Highlighting
-
-This will get us a more interpretable set of regions to investigate.
-
-```{r}
-merged_sig <- mergeWindows(sig, tol = 300, max.width = 5000)
-
-merged_regions <- merged_sig$regions
-
-# Limit to those that are at least 3 bins wide
-merged_regions <- merged_regions[width(merged_regions) >= 300]
-
-# For testing, limit to those on chr6
-merged_regions <- merged_regions[seqnames(merged_regions) == "chr2"]
-```
-
-### Visualization
-
-Now we can do the usual viz, e.g. MA plots and tracks.
-Depending on the groups being compared, you might expect larger shifts in the MA plot than you'd expect from a typical gene-level analysis.
-SEs are relatively cell-type specific and somewhat dynamic, plus we'll be looking at the individual bins composing them.
-
-A typical MA plot is of limited utility here, but we can still generate one.
-
-```{r}
-plotMA(rezzy, alpha = 0.05)
-```
-
-### Gviz Viz
-
-This is a more complex example of how you might visualize the results of the differential analysis using Gviz.
-
-```{r}
-# Get region for SE with most DB bins
-top.db <- db.ses$REGION_ID[66]
-se.info <- se_gr[se_gr$REGION_ID == top.db,]
-
-# Genome track
-gtrack <- GenomeAxisTrack()
-itrack <- IdeogramTrack(genome = "hg38")
-
-# Annotation track
-greg <- GeneRegionTrack(txdb, showId=TRUE,
-    geneSymbol=TRUE, name="", background.title="transparent")
-symbols <- unlist(mapIds(org.Hs.eg.db, gene(greg), "SYMBOL",
-    "ENTREZID", multiVals = "first"))
-symbol(greg) <- symbols[gene(greg)]
-
-# SE track
-setrack <- AnnotationTrack(se_gr, genome = "hg38", name = "SEs")
-
-# SE bin data
-sigfctrack <- DataTrack(range = sig, data = -sig$log2FoldChange, name = "sig_bins_FCs", genome = "hg38", 
-                         ylim = c(-max(abs(sig$log2FoldChange)), max(abs(sig$log2FoldChange))), type = "b", 
-                     col = "orange", background.title = "orange", baseline = 0)
-
-# SE bin foldchanges
-fctrack <- DataTrack(range = res, data = -res$log2FoldChange, name = "bin_FCs", genome = "hg38", 
-                         ylim = c(-max(abs(res$log2FoldChange)), max(abs(res$log2FoldChange))), 
-                     type = "b", col = "black", background.title = "black", baseline = 0)
-
-
-# Signal Tracks
-bw_na1 <- "./example_data/bigWigs/ENCFF993DJI.naive_Bcell.H3K27ac.rep1.bigWig"
-bw_na2 <- "./example_data/bigWigs/ENCFF808SRS.naive_Bcell.H3K27ac.rep2.bigWig"
-bw_act1 <- "./example_data/bigWigs/ENCFF640GBC.activated_Bcell.H3K27ac.rep1.bigWig"
-bw_act2 <- "./example_data/bigWigs/ENCFF267CCT.activated_Bcell.H3K27ac.rep2.bigWig"
-
-naive1_track <- DataTrack(range = bw_na1, type = "l", name = "naiveB_r1", genome = "hg38", 
-                        col = "blue", background.title = "blue", ylim = c(0, 12), baseline = 0)
-naive2_track <- DataTrack(range = bw_na2, type = "l", name = "naiveB_r2", genome = "hg38", 
-                        col = "blue", background.title = "blue", ylim = c(0, 12), baseline = 0)
-act1_track <- DataTrack(range = bw_act1, type = "l", name = "activatedB_r1", genome = "hg38", 
-                        col = "red", background.title = "red", ylim = c(0, 12), baseline = 0)
-act2_track <- DataTrack(range = bw_act2, type = "l", name = "activatedB_r2", genome = "hg38", 
-                        col = "red", background.title = "red", ylim = c(0, 12), baseline = 0)
-
-# Highlight sig bins
-ht <- HighlightTrack(trackList = list(act1_track, act2_track, fctrack, sigfctrack, naive1_track, naive2_track),
-                     start = start(merged_regions), end = end(merged_regions), chromosome = as.character(seqnames(se.info)),
-                     fill = "#d3ff8c", col = "#8ff7df")
-
-plotTracks(list(gtrack, itrack, greg, setrack, ht), from = start(se.info), to = end(se.info), chromosome = as.character(seqnames(se.info)), transcriptAnnotation = "symbol", collapseTranscripts = "longest")
+```{r, fig.cap="A heavily affected SE region between activated and naive B cells.", fig.align = "center", echo=FALSE}
+knitr::include_graphics("./images/plot_locus_example.png")
 ```
 
 ## SessionInfo

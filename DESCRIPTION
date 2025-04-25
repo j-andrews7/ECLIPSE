@@ -52,7 +52,8 @@ Suggests:
     segmented,
     ggrastr,
     plotly,
-    excluderanges
+    excluderanges,
+    AnnotationHub
 Depends:
     R (>= 4.4.0)
 biocViews: 
