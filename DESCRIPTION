@@ -51,7 +51,8 @@ Suggests:
     apeglm,
     segmented,
     ggrastr,
-    plotly
+    plotly,
+    excluderanges
 Depends:
     R (>= 4.4.0)
 biocViews: 

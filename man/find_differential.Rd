@@ -12,9 +12,9 @@ find_differential(
   g2.name = "group2",
   window.size = 150,
   window.spacing = 50,
+  param = readParam(minq = 20, dedup = FALSE),
   paired = FALSE,
   fragment.length = 200,
-  quality = 20,
   bg.bin.width = 2000,
   bg.fc = 3,
   merged.adj.width = 100,
@@ -43,16 +43,17 @@ Default is \code{150}.}
 \item{window.spacing}{An integer specifying the distance (bp) between windows.
 Default is \code{50}.}
 
+\item{param}{A \link[csaw:readParam]{csaw::readParam} object specifying parameters for read counting.
+This can be used to restrict chromosomes or exclude intervals (like blacklists).
+Default is \code{readParam(minq = 20, dedup = FALSE)}.}
+
 \item{paired}{A boolean specifying whether reads are paired-end.
 Default is \code{FALSE}.}
 
 \item{fragment.length}{An integer specifying the fragment length.
 If paired-end, this argument is ignored.
-If \code{NULL}, calculated using \code{correlateReads} from \code{csaw}, which is rather slow.
+If \code{NULL}, calculated using \code{\link[csaw:correlateReads]{csaw::correlateReads()}}, which is rather slow.
 Default is \code{200}.}
-
-\item{quality}{An integer specifying the minimum mapping quality score to include reads.
-Default is \code{20}.}
 
 \item{bg.bin.width}{An integer specifying the bin width (bp) to calculate background abundance.
 Default is \code{2000}.}
@@ -65,18 +66,24 @@ Default is \code{3}.}
 Adjacent windows within this distance will be merged.
 Default is \code{100}.}
 
-\item{merged.max.width}{An integer specifying the maximum width (bp) of merged windows.
-Default is \code{50000}}
+\item{merged.max.width}{An integer specifying the maximum width (bp) of merged windows to mitigate
+excessive daisy chaining.
+Default is \code{30000}.}
 
-\item{BPPARAM}{A \linkS4class{BiocParallelParam} specifying parallelization strategy.
-Default is \linkS4class{SerialParam}.}
+\item{BPPARAM}{A \link[BiocParallel:BiocParallelParam-class]{BiocParallel::BiocParallelParam} specifying parallelization strategy.
+Default is \link[BiocParallel:SerialParam-class]{BiocParallel::SerialParam}.}
 
 \item{debug}{Boolean specifying whether to return a list of intermediate objects for key analysis steps.
 Default is \code{FALSE}.}
 }
 \value{
-A \code{GRanges} object containing regions with associated
+A named list containing:
+\itemize{
+\item \strong{merged_regions} - A \link[GenomicRanges:GRanges-class]{GenomicRanges::GRanges} object containing regions with associated
 differential analysis results including log-fold changes, p-values, FDR, and other statistics.
+\item \strong{filtered_window_counts} - A \link[SummarizedExperiment:RangedSummarizedExperiment-class]{SummarizedExperiment::RangedSummarizedExperiment}
+object containing filtered window counts, useful for coverage calculation, viz, etc.
+}
 }
 \description{
 This function identifies differential signal between two conditions
@@ -97,15 +104,16 @@ model with quasi-likelihood (QL).
 \item Differential analysis is performed using a QL F-test to
 assign statistical significance to each window.
 \item Windows are merged into regions based on proximity, and test statistics
-from individual windows are combined.
+from individual windows are combined via \code{\link[csaw:mergeResults]{csaw::mergeResults()}}.
 \item Differential analysis statistics are added to the metadata of merged regions.
 }
 }
 \examples{
 \dontrun{
-significant.regions <- find_differential(regions = my.granges,
-                                         g1.bam.files = my.bam1,
-                                         g2.bam.files = my.bam2
+significant.regions <- find_differential(
+    regions = my.granges,
+    g1.bam.files = my.bam1,
+    g2.bam.files = my.bam2
 )
 }
 

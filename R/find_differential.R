@@ -13,11 +13,11 @@
 #' 3. Windows with low read counts relative to background are filtered out.
 #' 4. Normalization is performed to account for trended bias.
 #' 5. Dispersion is modeled using a negative binomial generalized linear
-#'   model with quasi-likelihood (QL).
+#'    model with quasi-likelihood (QL).
 #' 6. Differential analysis is performed using a QL F-test to
-#'   assign statistical significance to each window.
+#'    assign statistical significance to each window.
 #' 7. Windows are merged into regions based on proximity, and test statistics
-#'   from individual windows are combined.
+#'    from individual windows are combined via [csaw::mergeResults()].
 #' 8. Differential analysis statistics are added to the metadata of merged regions.
 #'
 #' @param regions A `GRanges` object of regions to compare between conditions.
@@ -32,14 +32,15 @@
 #'   Default is `150`.
 #' @param window.spacing An integer specifying the distance (bp) between windows.
 #'   Default is `50`.
+#' @param param A [csaw::readParam-class] object specifying parameters for read counting.
+#'   This can be used to restrict chromosomes or exclude intervals (like blacklists).
+#'   Default is `readParam(minq = 20, dedup = FALSE)`.
 #' @param paired A boolean specifying whether reads are paired-end.
 #'   Default is `FALSE`.
 #' @param fragment.length An integer specifying the fragment length.
 #'   If paired-end, this argument is ignored.
-#'   If `NULL`, calculated using `correlateReads` from `csaw`, which is rather slow.
+#'   If `NULL`, calculated using [csaw::correlateReads()], which is rather slow.
 #'   Default is `200`.
-#' @param quality An integer specifying the minimum mapping quality score to include reads.
-#'   Default is `20`.
 #' @param bg.bin.width An integer specifying the bin width (bp) to calculate background abundance.
 #'   Default is `2000`.
 #' @param bg.fc A numeric specifying the minimum fold change above background
@@ -48,15 +49,19 @@
 #' @param merged.adj.width An integer specifying the maximum distance between adjacent windows.
 #'   Adjacent windows within this distance will be merged.
 #'   Default is `100`.
-#' @param merged.max.width An integer specifying the maximum width (bp) of merged windows.
-#'   Default is `50000`
-#' @param BPPARAM A \linkS4class{BiocParallelParam} specifying parallelization strategy.
-#'   Default is \linkS4class{SerialParam}.
+#' @param merged.max.width An integer specifying the maximum width (bp) of merged windows to mitigate
+#'   excessive daisy chaining.
+#'   Default is `30000`.
+#' @param BPPARAM A [BiocParallel::BiocParallelParam-class] specifying parallelization strategy.
+#'   Default is [BiocParallel::SerialParam-class].
 #' @param debug Boolean specifying whether to return a list of intermediate objects for key analysis steps.
 #'   Default is `FALSE`.
 #'
-#' @return A `GRanges` object containing regions with associated
-#' differential analysis results including log-fold changes, p-values, FDR, and other statistics.
+#' @return A named list containing:
+#'   * **merged_regions** - A [GenomicRanges::GRanges-class] object containing regions with associated
+#'     differential analysis results including log-fold changes, p-values, FDR, and other statistics.
+#'   * **filtered_window_counts** - A [SummarizedExperiment::RangedSummarizedExperiment-class]
+#'     object containing filtered window counts, useful for coverage calculation, viz, etc.
 #'
 #' @importFrom GenomicRanges slidingWindows reduce mcols
 #' @importFrom csaw readParam correlateReads maximizeCcf regionCounts windowCounts
@@ -64,6 +69,7 @@
 #' @importFrom edgeR estimateDisp glmQLFit glmQLFTest
 #' @importFrom BiocParallel SerialParam
 #' @importFrom Rsamtools indexBam
+#' @importFrom stats relevel model.matrix
 #'
 #' @export
 #'
@@ -71,9 +77,10 @@
 #'
 #' @examples
 #' \dontrun{
-#' significant.regions <- find_differential(regions = my.granges,
-#'                                          g1.bam.files = my.bam1,
-#'                                          g2.bam.files = my.bam2
+#' significant.regions <- find_differential(
+#'     regions = my.granges,
+#'     g1.bam.files = my.bam1,
+#'     g2.bam.files = my.bam2
 #' )
 #' }
 #'
@@ -82,18 +89,15 @@ find_differential <- function(regions, g1.bam.files, g2.bam.files,
                               g2.name = "group2",
                               window.size = 150,
                               window.spacing = 50,
-                               # optional args to readParam for restricting chromosomes or excluding intervals
-                               # restrict = NULL, discard = NULL,
+                              param = readParam(minq = 20, dedup = FALSE),
                               paired = FALSE,
                               fragment.length = 200,
-                              quality = 20,
                               bg.bin.width = 2000,
                               bg.fc = 3,
                               merged.adj.width = 100,
                               merged.max.width = 50000,
                               BPPARAM = SerialParam(),
                               debug = FALSE) {
-
     # ------------ CHECKS ------------
     # Check if regions is a GRanges object
     if (!inherits(regions, "GRanges")) {
@@ -122,13 +126,14 @@ find_differential <- function(regions, g1.bam.files, g2.bam.files,
         }
     }
 
-    conditions <- c(rep(g1.name, length(g1.bam.files)),
-                    rep(g2.name, length(g2.bam.files)))
+    conditions <- c(
+        rep(g1.name, length(g1.bam.files)),
+        rep(g2.name, length(g2.bam.files))
+    )
 
     if (!is.factor(conditions)) {
-        conditions <- factor(conditions,
-                             levels = c(g1.name, g2.name),
-                             ordered = TRUE)
+        conditions <- factor(conditions)
+        conditions <- relevel(conditions, ref = g1.name)
     }
 
     # ------------ WINDOWS ------------
@@ -160,20 +165,20 @@ find_differential <- function(regions, g1.bam.files, g2.bam.files,
     my_args <- list(
         bam.files = bams,
         regions = region_windows,
-        param = my_param,
+        param = param,
         BPPARAM = BPPARAM
     )
 
     if (paired == TRUE) {
         message("Paired-end read mode.")
-        my_param <- reform(my_param, pe = "both")
+        param <- reform(param, pe = "both")
     } else {
         message("Single-end read mode.")
 
         # Define the fragment length
-        if(is.null(fragment.length)) {
+        if (is.null(fragment.length)) {
             message("Approximating the fragment length...")
-            ccf <- correlateReads(bams, param = my_param, max.dist = 500, BPPARAM = BPPARAM) # slow
+            ccf <- correlateReads(bams, param = param, max.dist = 500, BPPARAM = BPPARAM) # slow
             fragment.length <- maximizeCcf(ccf)
         }
         message(paste0("Fragment length set at ", fragment.length, " bp."))
@@ -192,7 +197,7 @@ find_differential <- function(regions, g1.bam.files, g2.bam.files,
     message("Calculating background abundance using ", bg.bin.width, " bp bins...")
     time1 <- Sys.time()
 
-    bg_bins <- windowCounts(bams, bin = TRUE, width = bg.bin.width, param = my_param, BPPARAM = BPPARAM)
+    bg_bins <- windowCounts(bams, bin = TRUE, width = bg.bin.width, param = param, BPPARAM = BPPARAM)
     time2 <- Sys.time()
     message(paste0("Time elapsed: ", (time2 - time1)))
 
@@ -211,8 +216,10 @@ find_differential <- function(regions, g1.bam.files, g2.bam.files,
     len_original <- length(window_counts)
     pct_filtered <- round((len_filtered / len_original) * 100, 2)
 
-    message("Kept ", len_filtered, " of ", len_original, " windows ",
-            "(", pct_filtered, "%)")
+    message(
+        "Kept ", len_filtered, " of ", len_original, " windows ",
+        "(", pct_filtered, "%)"
+    )
 
     # ------------ NORMALIZATION ------------
     message("Performing normalization...")
@@ -231,23 +238,27 @@ find_differential <- function(regions, g1.bam.files, g2.bam.files,
 
     fit <- glmQLFit(y, design, robust = TRUE)
 
-    message("Performing quasi-likelihood F-Test using levels: ",
-            paste(levels(conditions), collapse = " "))
+    message(
+        "Performing quasi-likelihood F-Test using levels: ",
+        paste(levels(conditions), collapse = " ")
+    )
 
-    results <- glmQLFTest(fit, coef = "Condition")
+    results <- glmQLFTest(fit)
 
     rowData(filtered_window_counts) <- cbind(rowData(filtered_window_counts), results$table)
 
     # ------------ MERGE WINDOWS ------------
-    message("Merging adjacent windows within ", merged.adj.width,
-            " bp and limiting merged regions to ",
-            merged.max.width, " bp...")
+    message(
+        "Merging adjacent windows within ", merged.adj.width,
+        " bp and limiting merged regions to ",
+        merged.max.width, " bp..."
+    )
 
     merged_results <- mergeResults(filtered_window_counts,
-                                   mcols(filtered_window_counts),
-                                   tol = merged.adj.width,
-                                   merge.args = list(max.width = merged.max.width)
-                                   )
+        mcols(filtered_window_counts),
+        tol = merged.adj.width,
+        merge.args = list(max.width = merged.max.width)
+    )
 
     message("Created ", length(merged_results$regions), " regions from ", len_filtered, " windows...")
 
@@ -262,7 +273,7 @@ find_differential <- function(regions, g1.bam.files, g2.bam.files,
     # report regions that have FDR <= 0.05
     sig <- table(merged_regions$FDR <= 0.05)[2]
     total <- length(merged_regions$FDR)
-    sig_pct <- round((sig/total)*100,2)
+    sig_pct <- round((sig / total) * 100, 2)
     message("Summary: ", sig, " of ", total, " merged regions (", sig_pct, "%) have an FDR <= 0.05.")
 
     if (debug == TRUE) {
@@ -270,6 +281,9 @@ find_differential <- function(regions, g1.bam.files, g2.bam.files,
             list(region_windows, window_counts, filtered_window_counts, merged_results, merged_regions)
         )
     } else {
-        return(merged_regions)
+        return(list(
+            merged_regions = merged_regions,
+            filtered_window_counts = filtered_window_counts
+        ))
     }
 }

@@ -115,7 +115,7 @@ Though the example above uses BAM files, `run_rose` can also accept BigWig or be
 
 Can't be a super enhancer package without the classic swoosh plot.
 
-```{r}
+```{r, eval = FALSE}
 plot_enhancer_curve(naiveB1_enhancers, factor_label = "H3K27ac")
 ```
 
@@ -173,7 +173,7 @@ What is less well documented in the original ROSE implementation is that this al
 
 The original implementation provides no way to alter or disable this behavior, but ECLIPSE does.
 
-```{r}
+```{r, eval = FALSE}
 # With TSS exclusion and unstitching, a la the original ROSE implementation
 res_tss_exl <- run_rose(treatment = treat_path,
                         control = control_path,
@@ -195,19 +195,19 @@ We can then see how these differ in the number of SEs identified.
 
 With TSS exclusion and unstitching, as is commonly done with the original implementation for H3K27ac data:
 
-```{r}
+```{r, eval = FALSE}
 plot_enhancer_curve(res_tss_exl, factor_label = "H3K27ac")
 ```
 
 With TSS exclusion but no unstitching:
 
-```{r}
+```{r, eval = FALSE}
 plot_enhancer_curve(res_tss_exl_no_unstitch, factor_label = "H3K27ac")
 ```
 
 These settings have dramatic impacts on the final number of regions returned and the number (and size) of SEs identified.
 
-```{r}
+```{r, eval = FALSE}
 message("Number of regions returned with TSS exclusion and unstitching: ", length(res_tss_exl))
 message("Number of regions returned with TSS exclusion and no unstitching: ", length(res_tss_exl_no_unstitch))
 
@@ -226,7 +226,7 @@ Given the lack of documentation or discussion on this behavior in the original i
 
 Though this is a reasonable estimate for most ChIP-seq data, we can also determine the fragment length from the data as specified by [csaw](https://bioconductor.org/books/3.20/csawBook/counting-reads-into-windows.html#sec:ccf).
 
-```{r}
+```{r, eval = FALSE}
 # Removing duplicates for this is often necessary as there tends to be an artifactual peak at a distance equal to the read length.
 dedup.param <- readParam(minq = 20, dedup = TRUE)
 x <- correlateReads(treat_path, max.dist = 500, param = dedup.param)
@@ -236,7 +236,7 @@ plot(0:500, x, type = "l", ylab = "CCF", xlab = "Delay (bp)")
 200 bp is a reasonable estimate, but we could also use the peak of the cross-correlation function as the 
 fragment length to provide to the `read.ext` parameter in `run_rose`.
 
-```{r}
+```{r, eval = FALSE}
 frag.len <- maximizeCcf(x)
 frag.len
 ```
@@ -256,7 +256,7 @@ This is one such case, as this BigWig file is the foldchange of H3K27ac signal i
 
 As such, it makes sense to set `floor = 0` for the "signal" calculation as much of the artifact noise should have been removed.
 
-```{r}
+```{r, eval = FALSE}
 library(rtracklayer)
 
 naiveB1_bw <- rtracklayer::import(treat_bw_path)
@@ -284,7 +284,7 @@ It'd be convenient if we could get a relatively normal distribution of signal va
 As such, let's test a few transformations, make some histograms/qqplots, and see what looks best.
 We will also do this for width-normalized signal to see how that looks.
 
-```{r}
+```{r, eval = FALSE}
 logistic_transform_scaled_robust <- function(x) {
   center <- median(x, na.rm = TRUE)
   spread <- IQR(x, na.rm = TRUE) # interquartile range
@@ -601,7 +601,7 @@ winsorize_maintain_rank_minmax_transform <- function(x, upper_quantile = 0.999, 
 
 Now for each transformation function, we'll apply it to the signal to the signal column and plot the histograms, qqplots, and rank plot.
 
-```{r}
+```{r, eval = FALSE}
 library(patchwork)
 
 # Named list of transformations, underscore delimiter
@@ -695,7 +695,7 @@ If already run, one can re-run `run_rose` without performing stitching, re-calcu
 Simply set `force = FALSE` in the `run_rose` call and those steps will be skipped.
 This allows one to test different transformations or thresholding methods very quickly.
 
-```{r}
+```{r, eval = FALSE}
 # Let's try log2(x + 1) as a transformation.
 naiveB1_enhancers_from_existing <- run_rose(peaks = naiveB1_enhancers,
                                             transformation = function(x) log2(x + 1), 
@@ -723,7 +723,7 @@ These groups have enough similarities to demonstrate how this analysis looks for
 
 ### Download Data
 
-```{r}
+```{r, eval = FALSE}
 naiveB1_treat_url <- "https://www.encodeproject.org/files/ENCFF993DJI/@@download/ENCFF993DJI.bam"
 naiveB1_treat_path <- bfcrpath(bfc, naiveB1_treat_url)
 
@@ -787,6 +787,18 @@ actB2_peaks_path <- bfcrpath(bfc, actB2_peaks_url)
 actB2_treat_bam <- BamFile(actB2_treat_path)
 actB2_control_bam <- BamFile(actB2_control_path)
 actB2_peaks <- readBed(actB2_peaks_path)
+
+# Make a data.frame of samples, paths, groups, and colors
+# Activated first, then naive
+sample_df <- data.frame(
+  sample = c("actB1", "actB2", "naiveB1", "naiveB2"),
+  treat_bam = c(actB1_treat_path, actB2_treat_path, naiveB1_treat_path, naiveB2_treat_path),
+  control_bam = c(actB1_control_path, actB2_control_path, naiveB1_control_path, naiveB2_control_path),
+  treat_bw = c(actB1_treat_bw_path, actB2_treat_bw_path, naiveB1_treat_bw_path, naiveB2_treat_bw_path),
+  peaks = c(actB1_peaks_path, actB2_peaks_path, naiveB1_peaks_path, naiveB2_peaks_path),
+  group = c("Activated", "Activated", "Naive", "Naive"),
+  color = c("red", "red", "blue", "blue")
+)
 ```
 
 
@@ -809,7 +821,7 @@ But in this case, it feels like a reasonable assumption.
 
 So to derive this consensus set, we'll use the [rmspc](https://www.bioconductor.org/packages/release/bioc/vignettes/rmspc/inst/doc/rmpsc.html) package, which takes a similar approach to IDR.
 
-```{r}
+```{r, eval = FALSE}
 library(rmspc)
 
 # MSPC requires a config file that designates the p-value column of your BED file. For MACS2/3, and in this case, this is the 8th column.
@@ -844,13 +856,16 @@ act_mspc <- mspc(
 
 To ensure equal representation of each sample in the group's signal, we'll subsample each BAM to the lowest number of reads in any sample for the group and then merge.
 
-```{r}
+```{r, eval = FALSE}
 library(Rsamtools)
 library(GenomicAlignments)
 library(rtracklayer)
 
-actB_bams <- c(actB1_treat_path, actB2_treat_path)
-naiveB_bams <- c(naiveB1_treat_path, naiveB2_treat_path)
+actB_bams <- sample_df$treat_bam[sample_df$group == "Activated"]
+names(actB_bams) <- sample_df$sample[sample_df$group == "Activated"]
+
+naiveB_bams <- sample_df$treat_bam[sample_df$group == "Naive"]
+names(naiveB_bams) <- sample_df$sample[sample_df$group == "Naive"]
 
 out_act <- "actB_merged.bam"
 out_naive <- "naiveB_merged.bam"
@@ -899,7 +914,7 @@ Now we can call SEs for each group using the merged BAMs and consensus peaks.
 
 We find H3K27ac peaks at promoters to be more broad than is typically fully captured by the standard 2kb window, so we set the `tss.exclusion.distance` parameter to 3.5kb.
 
-```{r}
+```{r, eval = FALSE}
 naiveB_merge <- BamFile(out_naive)
 actB_merge <- BamFile(out_act)
 
@@ -916,7 +931,7 @@ actB_enhancers <- run_rose(treatment = actB_merge,
 
 Now we can merge the activated and naive B cell super enhancers.
 
-```{r}
+```{r, eval = FALSE}
 naiveB_SEs <- naiveB_enhancers[naiveB_enhancers$super]
 actB_SEs <- actB_enhancers[actB_enhancers$super]
 all_SEs <- unlist(as(list(naiveB_SEs, actB_SEs), "GRangesList"))
@@ -946,7 +961,7 @@ The analysis proceeds through the following steps:
    from individual windows are combined.
  8. Differential analysis statistics are added to the metadata of merged regions.
  
-```{r}
+```{r,e val = FALSE}
 act_v_naive <- find_differential(
     regions = all_SEs,
     g1.bam.files = actB_bams,
@@ -955,14 +970,76 @@ act_v_naive <- find_differential(
     g2.name = "NaiveB",
     paired = FALSE,
     fragment.length = 200,
-    bg.fc = 3,
+    bg.fc = 5,
     merged.max.width = 50000
 )
+
+act_v_naive_res <- act_v_naive$merged_regions
 ```
 
 Note we could also run this on all regions rather than just the super enhancers.
 `bg.fc` is the fold-change above background a window must have to be retained - 
-we find 3 is a reasonable starting point, but can be adjusted to be more/less stringent.
+the default is quite conservative (3), but 5 is a more appropriate value for this dataset.
+Adjust to be more or less stringent as necessary.
+
+### Prioritize SEs by Number of Altered Regions
+
+A simple way to prioritize the output is just to take those SEs with the most regions affected.
+Of course, this ignores region size, but it's a sufficient proxy for our purposes.
+
+```{r, eval = FALSE}
+# Get table of counts of significant regions for each REGION_ID and rank by most affected
+count_significant_regions <- function(gr) {
+  sig <- gr[gr$FDR < 0.05]
+  counts <- table(sig$REGION_ID)
+  counts_df <- as.data.frame(counts)
+  colnames(counts_df) <- c("REGION_ID", "Count")
+  counts_df[order(-counts_df$Count), ]
+}
+
+act_v_naive_counts <- count_significant_regions(act_v_naive_res)
+
+altered <- act_v_naive_res$REGION_ID %in% act_v_naive_counts$REGION_ID
+
+act_v_naive_res$NUM_ALTERED_WIN <- 0
+act_v_naive_res$NUM_ALTERED_WIN[altered] <- act_v_naive_counts$Count[match(act_v_naive_res$REGION_ID[altered], act_v_naive_counts$REGION_ID)]
+
+# Sort by number of altered regions
+act_v_naive_res <- sort(act_v_naive_res, by=~NUM_ALTERED_WIN+REGION_ID, decreasing = TRUE)
+```
+
+### Viz
+
+Naturally, we need eyeballs on this.
+Unfortunately, heatmaps and volcano plots are pretty worthless for this sort of data, so loci snapshots it is.
+
+We can use the `plot_locus()` function to take a snapshot of a given SE with the significantly
+altered regions highlighted.
+
+```{r, eval = FALSE}
+top_se <- act_v_naive_res$REGION_ID[1]
+top_se_reg <- act_v_naive_res[act_v_naive_res$REGION_ID == top_se]
+top_se_reg_sig <- top_se_reg[top_se_reg$FDR < 0.05]
+
+# Get the SE region
+se_gr <- all_SEs[all_SEs$REGION_ID == top_se]
+
+# Genome track
+gtrack <- GenomeAxisTrack()
+itrack <- IdeogramTrack(chromosome = as.character(seqnames(se_gr)), genome = "hg38")
+
+# Annotation track
+greg <- GeneRegionTrack(txdb, showId=TRUE,
+    geneSymbol=TRUE, name="", background.title="transparent")
+symbols <- unlist(mapIds(org.db, gene(greg), "SYMBOL",
+    "ENTREZID", multiVals = "first"))
+symbol(greg) <- symbols[gene(greg)]
+
+plot_locus(se_gr, top_se_reg, act_v_naive$filtered_window_counts,
+           g1.bam.files = actB_bams, g2.bam.files = naiveB_bams,
+           top.tracks = c(gtrack, itrack, greg))
+```
+
 
 
 ## Differential Analysis via DESeq2
@@ -1063,7 +1140,7 @@ gtrack <- GenomeAxisTrack()
 itrack <- IdeogramTrack(genome = "hg38")
 
 # Annotation track
-greg <- GeneRegionTrack(TxDb.Hsapiens.UCSC.hg38.knownGene, showId=TRUE,
+greg <- GeneRegionTrack(txdb, showId=TRUE,
     geneSymbol=TRUE, name="", background.title="transparent")
 symbols <- unlist(mapIds(org.Hs.eg.db, gene(greg), "SYMBOL",
     "ENTREZID", multiVals = "first"))

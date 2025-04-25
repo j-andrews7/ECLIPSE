@@ -279,3 +279,233 @@ plot_qq <- function(
 
     p
 }
+
+
+#' Plot Locus
+#'
+#' This function generates a locus visualization plot using genomic regions,
+#' signal tracks, and fold-change data.
+#' It supports highlighting significant
+#' regions and customizing the appearance of tracks.
+#'
+#' @details
+#' Coverage tracks are generated from BAM files and normalized by library size to reads per million.
+#' While not a perfect normalization, as it doesn't account for composition effects, it is often
+#' sufficient for visualization of robust differences between groups with sufficient numbers of replicates.
+#'
+#' @param region.gr [GenomicRanges::GRanges-class] object containing a single region to plot.
+#' @param window.gr [GenomicRanges::GRanges-class] object representing merged windows with
+#'   associated statistics, as returned by [find_differential()].
+#' @param window.rse [SummarizedExperiment::RangedSummarizedExperiment-class] object
+#'   containing read count data and library sizes, as returned by [find_differential()].
+#' @param g1.bam.files Named list of BAM file paths for group 1.
+#' @param g2.bam.files Named list of BAM file paths for group 2.
+#' @param genome String specifying the genome assembly.
+#'   This is generally expected to match the UCSC conventions for genome assemblies.
+#'   Default is "hg38".
+#' @param region.track.name String for the name of the region track.
+#'   Default is "SEs".
+#' @param padding Numeric value specifying the padding around regions.
+#'   This is used to expand the region for additional context by expanding
+#'   the region by a factor of (1 + padding).
+#'   Default is 0.3, e.g. 30% of the region size.
+#' @param fdr.thresh Numeric value specifying the FDR threshold for significance.
+#'   Default is 0.05.
+#' @param fc.track.position String specifying the position of the fold-change track
+#'   relative to signal tracks. Options are "between", "above", or "below".
+#'   Default is "between".
+#' @param g1.bw.files Optional list of BigWig file paths for group 1.
+#'   Not implemented currently.
+#' @param g2.bw.files Optional list of BigWig file paths for group 2.
+#'   Not implemented currently.
+#' @param g1.fill String specifying the fill color for group 1 tracks.
+#'   Default is "red".
+#' @param g2.fill String specifying the fill color for group 2 tracks.
+#'   Default is "blue".
+#' @param param [csaw::readParam-class] object specifying read extraction parameters.
+#'   Default is `readParam(minq = 20, dedup = FALSE)`.
+#' @param top.tracks Optional list of additional tracks to display above the main tracks.
+#'   Default is NULL.
+#' @param bottom.tracks Optional list of additional tracks to display below the main tracks.
+#'   Default is NULL.
+#' @param main String specifying the main title of the plot.
+#'   Default is "".
+#' @param region.lfc.color String specifying the color of the log2 fold-change track.
+#'   Default is "black".
+#' @param highlight.sig Logical indicating whether to highlight significant regions.
+#'   Default is TRUE.
+#' @param higlight.fill String specifying the fill color for highlighted regions.
+#'   Default is "#d3ff8c".
+#' @param highlight.color String specifying the border color for highlighted regions.
+#'   Default is "#8ff7df".
+#' @param ... Additional arguments passed to the `plotTracks` function.
+#'
+#' @return A list of Gviz tracks.
+#'
+#' @examples
+#' # Example usage:
+#' plot_locus(
+#'   region.gr = my_regions,
+#'   window.gr = my_windows,
+#'   window.rse = my_rse,
+#'   g1.bam.files = list("sample1" = "path/to/sample1.bam"),
+#'   g2.bam.files = list("sample2" = "path/to/sample2.bam"),
+#'   genome = "hg38",
+#'   region.track.name = "My Regions",
+#'   padding = 0.2,
+#'   fdr.thresh = 0.01
+#' )
+#'
+#' @importFrom GenomicRanges start end seqnames width resize
+#' @importFrom Gviz plotTracks DataTrack AnnotationTrack HighlightTrack
+#' @importFrom csaw extractReads readParam
+#' 
+#' @author Jared Andrews
+#' 
+#' @export
+plot_locus <- function(
+    region.gr,
+    window.gr,
+    window.rse,
+    g1.bam.files,
+    g2.bam.files,
+    genome = "hg38",
+    region.track.name = "SEs",
+    padding = 0.3,
+    fdr.thresh = 0.05,
+    fc.track.position = c("between", "above", "below"),
+    g1.bw.files = NULL,
+    g2.bw.files = NULL,
+    g1.fill = "red",
+    g2.fill = "blue",
+    param = readParam(minq = 20, dedup = FALSE),
+    top.tracks = NULL,
+    bottom.tracks = NULL,
+    main = "",
+    region.lfc.color = "black",
+    highlight.sig = TRUE,
+    higlight.fill = "#d3ff8c",
+    highlight.color = "#8ff7df",
+    ...) {
+    fc.track.position <- match.arg(fc.track.position)
+
+    # Get significant regions
+    top_se_reg_sig <- window.gr[window.gr$FDR < fdr.thresh]
+
+    # Region track
+    padded_gr <- resize(region.gr, width = width(region.gr) * (1 + padding), fix = "center")
+    reg_track <- AnnotationTrack(region.gr,
+        genome = genome, name = region.track.name,
+        background.title = "white", col.axis = "black",
+        col.title = "black"
+    )
+
+    # Get significant regions
+    top_se_reg_sig <- window.gr[window.gr$FDR < fdr.thresh]
+
+    # Region foldchanges
+    fctrack <- DataTrack(
+        range = top_se_reg, data = top_se_reg$rep.logFC, name = "Region FCs",
+        genome = genome, ylim = c(
+            -max(abs(top_se_reg$rep.logFC)),
+            max(abs(top_se_reg$rep.logFC))
+        ),
+        type = "b", col = region.lfc.color,
+        background.title = "white", baseline = 0, col.axis = "black",
+        col.title = "black"
+    )
+
+
+    # Signal Tracks
+    # naive1_track <- DataTrack(range = naiveB1_treat_bw_path, type = "histogram",
+    #                           name = "naiveB_r1", genome = "hg38",
+    #                         fill = "blue", background.title = "blue", baseline = 0)
+    # naive2_track <- DataTrack(range = naiveB2_treat_bw_path, type = "histogram",
+    #                           name = "naiveB_r2", genome = "hg38",
+    #                         fill = "blue", background.title = "blue", baseline = 0)
+    # act1_track <- DataTrack(range = actB1_treat_bw_path, type = "histogram",
+    #                         name = "activatedB_r1", genome = "hg38",
+    #                         fill = "red", background.title = "red", baseline = 0)
+    # act2_track <- DataTrack(range = actB2_treat_bw_path, type = "histogram",
+    #                         name = "activatedB_r2", genome = "hg38",
+    #                         fill = "red", background.title = "red", baseline = 0)
+
+    # Signal Tracks from BAMs
+    g1_collected <- list()
+    g1_covs <- list()
+    g2_collected <- list()
+    g2_covs <- list()
+    max_cov <- 1
+    g1_lib_sizes <- window.rse$totals[colnames(window.rse) %in% names(g1.bam.files)] / 1e6
+    g2_lib_sizes <- window.rse$totals[colnames(window.rse) %in% names(g2.bam.files)] / 1e6
+
+    for (i in seq_along(g1.bam.files)) {
+        reads <- extractReads(bam.file = g1.bam.files[[i]], padded_gr, param = param)
+        cov <- as(coverage(reads) / g1_lib_sizes[i], "GRanges")
+        g1_covs[[i]] <- cov
+        if (max(cov$score) > max_cov) {
+            max_cov <- max(cov$score)
+        }
+    }
+
+    for (i in seq_along(g2.bam.files)) {
+        reads <- extractReads(bam.file = g2.bam.files[[i]], padded_gr, param = param)
+        cov <- as(coverage(reads) / g2_lib_sizes[i], "GRanges")
+        g2_covs[[i]] <- cov
+        if (max(cov$score) > max_cov) {
+            max_cov <- max(cov$score)
+        }
+    }
+
+    for (i in seq_along(g1_covs)) {
+        g1_collected[[i]] <- DataTrack(g1_covs[[i]],
+            type = "histogram", lwd = 0, ylim = c(0, max_cov),
+            name = names(g1.bam.files)[i], col.axis = "black",
+            col.title = "black", genome = genome,
+            col.histogram = g1.fill, background.title = "white", baseline = 0
+        )
+    }
+
+    for (i in seq_along(g2_covs)) {
+        g2_collected[[i]] <- DataTrack(g2_covs[[i]],
+            type = "histogram", lwd = 0, ylim = c(0, max_cov),
+            name = names(g2.bam.files)[i], col.axis = "black",
+            col.title = "black", genome = genome,
+            col.histogram = g2.fill, background.title = "white", baseline = 0
+        )
+    }
+
+    tl <- c(reg_track, g1_collected, fctrack, g2_collected)
+
+    if (fc.track.position == "above") {
+        tl <- c(reg_track, fctrack, g1_collected, g2_collected)
+    } else if (fc.track.position == "below") {
+        tl <- c(reg_track, g1_collected, g2_collected, fctrack)
+    }
+
+    # Highlight sig bins
+    if (highlight.sig) {
+        ht <- HighlightTrack(
+            trackList = tl,
+            start = start(top_se_reg_sig),
+            end = end(top_se_reg_sig),
+            chromosome = as.character(seqnames(top_se_reg_sig)),
+            fill = "#d3ff8c",
+            col = "#8ff7df"
+        )
+    } else {
+        ht <- tl
+    }
+
+    tracklist <- unlist(list(top.tracks, ht, bottom.tracks))
+
+    plotTracks(tracklist,
+        from = start(padded_gr),
+        to = end(padded_gr),
+        chromosome = as.character(seqnames(padded_gr)),
+        transcriptAnnotation = "symbol",
+        collapseTranscripts = "longest",
+        main = main,
+        ...
+    )
+}
