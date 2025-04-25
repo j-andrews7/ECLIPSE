@@ -1,0 +1,13 @@
+{
+    "Chr":0,
+    "Left":1,
+    "Right":2,
+    "Name":3,
+    "Value":7,
+    "Strand":-1,
+    "Summit":-1,
+    "Culture":"en-US",
+    "PValueFormat":1,
+    "DefaultValue":0.0001,
+    "DropPeakIfInvalidValue":true
+ }

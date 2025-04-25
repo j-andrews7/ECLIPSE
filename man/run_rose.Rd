@@ -5,14 +5,15 @@
 \title{Run ROSE (Rank Ordering of Super-Enhancers)}
 \usage{
 run_rose(
-  treatment,
   peaks,
+  treatment = NULL,
   control = NULL,
   stitch.distance = 12500,
   tss.exclusion.distance = 0,
   txdb = NULL,
   org.db = NULL,
   drop.y = TRUE,
+  keep.only.standard = TRUE,
   max.unique.gene.tss.overlap = NULL,
   tss.overlap.distance = 50,
   negative.to.zero = TRUE,
@@ -34,13 +35,15 @@ run_rose(
   promoter.dist = c(2000, 200),
   active.genes = NULL,
   identify.active.genes = FALSE,
-  omit.unknown = TRUE
+  omit.unknown = TRUE,
+  force = FALSE,
+  debug = FALSE
 )
 }
 \arguments{
-\item{treatment}{A \code{BamFile} or \code{GRanges} object representing the sample signal.}
-
 \item{peaks}{A  \code{GRanges} object representing the peaks.}
+
+\item{treatment}{A \code{BamFile} or \code{GRanges} object representing the sample signal.}
 
 \item{control}{A \code{BamFile} or \code{GRanges} object representing the control (usually input or IgG) signal.
 Default is \code{NULL}.}
@@ -59,6 +62,10 @@ regions spanning TSSes from more than \code{max.unique.gene.tss.overlap} genes. 
 Default is \code{NULL}.}
 
 \item{drop.y}{Logical indicating whether to drop peaks on chromosome Y, as done by the original ROSE implementation.
+Default is \code{TRUE}.}
+
+\item{keep.only.standard}{Logical indicating whether to keep only standard chromosomes (1-22, X, Y, M).
+Helps to avoid warnings from mismatched \code{seqlevels} between \code{peaks} and \code{txdb}.
 Default is \code{TRUE}.}
 
 \item{max.unique.gene.tss.overlap}{Maximum number of unique genes that a region can overlap the TSS of before being unstitched.
@@ -93,7 +100,7 @@ Generally, unlikely to be useful for most applications.
 Default is 0.}
 
 \item{chord.threshold}{Numeric value for ignoring small differences when using the "chord" threshold method.
-May be useful for transformation that result in curves with small differences.
+May be useful for transformations that result in curves with small differences.
 Generally, unlikely to be useful for most applications.
 Default is 0.}
 
@@ -144,6 +151,13 @@ Default is \code{FALSE}.}
 \item{omit.unknown}{Logical indicating whether uncharacterized genes (i.e., gene symbols starting with \emph{LOC})
 should be excluded from annotations.
 Default is \code{TRUE}.}
+
+\item{force}{Logical indicating whether to force recalculation of coverage, peak stitching, and annotation
+even if \code{sample_signal} is found in the \code{peaks} object.
+Default is \code{TRUE}.}
+
+\item{debug}{Logical indicating whether to print debugging information and return a named list of
+intermediate results along with final results.}
 }
 \value{
 A \code{GRanges} object containing the classified regions and associated metadata of each,
@@ -176,7 +190,7 @@ that result in a consistent curve shape with a known maximum, like cumulative pr
 \dontrun{
 sample.bam <- "path/to/sample.bam"
 peaks <- "path/to/peaks.bed"
-result <- run_rose(sample.bam, peaks)
+result <- run_rose(peaks, sample.bam, force = TRUE)
 }
 }
 \author{

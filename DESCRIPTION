@@ -45,13 +45,15 @@ Suggests:
     testthat (>= 3.0.0),
     rmarkdown,
     BiocFileCache,
-    TxDb.Hsapiens.UCSC.hg38.knownGene,
+    TxDb.Hsapiens.UCSC.hg38.refGene,
     org.Hs.eg.db,
     DESeq2,
     apeglm,
     segmented,
     ggrastr,
-    plotly
+    plotly,
+    excluderanges,
+    AnnotationHub
 Depends:
     R (>= 4.4.0)
 biocViews: 

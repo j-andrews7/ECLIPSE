@@ -30,6 +30,9 @@ Currently, the package can be installed from GitHub:
 ```
 library(devtools)
 devtools::install_github("stjude-biohackathon/ECLIPSE")
+
+# Or the developmental branch
+devtools::install_github("stjude-biohackathon/ECLIPSE@dev")
 ```
 
 ## Quick Start
@@ -46,6 +49,7 @@ Below is an example of running ROSE on a BAM file of H3K27ac MINT ChIP-seq, an [
 See `?run_rose` for more details.
 
 ```r
+library(ECLIPSE)
 # We'll use the BiocFileCache package to download and cache the files, which will take a few minutes the first time they're used.
 library(BiocFileCache)
 
@@ -54,11 +58,17 @@ library(TxDb.Hsapiens.UCSC.hg38.knownGene)
 library(org.Hs.eg.db)
 
 txdb <- TxDb.Hsapiens.UCSC.hg38.knownGene
+
+# Limit to canonical chromosomes, out of bound warnings will abound if not done
+txdb <- keepStandardChromosomes(txdb, pruning.mode = "coarse")
 org.db <- org.Hs.eg.db
 
 bfc <- BiocFileCache(ask = FALSE)
 treat_url <- "https://www.encodeproject.org/files/ENCFF993DJI/@@download/ENCFF993DJI.bam"
 treat_path <- bfcrpath(bfc, treat_url)
+
+treat_bw_url <- "https://www.encodeproject.org/files/ENCFF901BFR/@@download/ENCFF901BFR.bigWig"
+treat_bw_path <- bfcrpath(bfc, treat_bw_url)
 
 control_url <- "https://www.encodeproject.org/files/ENCFF821MAI/@@download/ENCFF821MAI.bam"
 control_path <- bfcrpath(bfc, control_url)
@@ -66,11 +76,16 @@ control_path <- bfcrpath(bfc, control_url)
 peaks_url <- "https://www.encodeproject.org/files/ENCFF590DFY/@@download/ENCFF590DFY.bed.gz"
 peaks_path <- bfcrpath(bfc, peaks_url)
 
-naiveB1_enhancers <- run_rose(treatment = treat_path, control = control_path, peaks = peaks_path,
-                              txdb = txdb, org.db = org.db, stitch.distance = 12500, tss.exclusion.distance = 2500,
-                              max.unique.gene.tss.overlap = 2)
+treat_bam <- BamFile(treat_path)
+control_bam <- BamFile(control_path)
+peaks <- readBed(peaks_path)
 
-naiveB1_enhancers
+naiveB1_enhancers <- run_rose(treatment = treat_bam, control = control_bam, peaks = peaks,
+                              txdb = txdb, org.db = org.db, stitch.distance = 12500, tss.exclusion.distance = 2500,
+                              max.unique.gene.tss.overlap = 2,
+                              drop.no.signal = TRUE)
+
+head(naiveB1_enhancers)
 ```
 
 ## Development Roadmap
