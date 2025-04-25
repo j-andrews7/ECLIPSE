@@ -1058,6 +1058,12 @@ plot_locus(se_gr, top_se_reg, act_v_naive$filtered_window_counts,
 knitr::include_graphics("./images/plot_locus_example.png")
 ```
 
+This shows the SE region (orange) with the significantly altered regions (green) highlighted over
+H3K27ac ChIP-seq coverage (reads per million) for activated (red) and naive (blue) B cells.
+The log2 fold changes for the merged regions are shown in black.
+
+Looks pretty reasonable, and a few of the genes in this region have reasonable implications in B cell activation (*SOCS1*, *CIITA*, etc).
+
 ## SessionInfo
 
 <details>
