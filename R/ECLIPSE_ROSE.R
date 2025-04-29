@@ -639,7 +639,7 @@ classify_enhancers <- function(regions,
 #'   Default is `TRUE`.
 #' @param force Logical indicating whether to force recalculation of coverage, peak stitching, and annotation
 #'   even if `sample_signal` is found in the `peaks` object.
-#'   Default is `TRUE`.
+#'   Default is `FALSE`.
 #' @param debug Logical indicating whether to print debugging information and return a named list of
 #'   intermediate results along with final results.
 #'

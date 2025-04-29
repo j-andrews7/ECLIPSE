@@ -502,6 +502,8 @@ plot_locus <- function(
 
     tracklist <- unlist(list(top.tracks, ht, bottom.tracks))
 
+    browser()
+
     plotTracks(tracklist,
         from = start(padded_gr),
         to = end(padded_gr),
