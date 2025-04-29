@@ -260,9 +260,9 @@ find_differential <- function(regions, g1.bam.files, g2.bam.files,
 
     message("Created ", length(merged_results$regions), " regions from ", len_filtered, " windows...")
 
-    # get the combined statistics and assign the original REGION_ID
+    # get the combined statistics and assign the original name
     merged_combined <- merged_results$combined
-    merged_combined$REGION_ID <- filtered_window_counts@rowRanges$REGION_ID[merged_combined$rep.test]
+    merged_combined$name <- filtered_window_counts@rowRanges$name[merged_combined$rep.test]
 
     # get the GRanges of the combined windows
     merged_regions <- merged_results$regions
