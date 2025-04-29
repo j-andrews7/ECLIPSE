@@ -22,7 +22,8 @@
 #' 8. Differential analysis statistics are added to the metadata of merged regions.
 #'
 #' @param regions A `GRanges` object of regions to compare between conditions.
-#'   These regions will be reduced, i.e. overlapping regions will be merged to one.
+#'   These regions should be reduced, i.e. overlapping regions should be merged to one.
+#'   The regions must also contain a "name" column with unique identifiers for each region.
 #' @param g1.bam.files A character vector of BAM file paths for group 1.
 #' @param g2.bam.files A character vector of BAM file paths for group 2.
 #' @param g1.name A character string specifying the name of group 1.
@@ -105,6 +106,11 @@ find_differential <- function(regions, g1.bam.files, g2.bam.files,
         stop("`regions` must be a GRanges object.")
     }
 
+    # Check if regions have a name column
+    if (!"name" %in% colnames(mcols(regions))) {
+        stop("`regions` must contain a 'name' column with unique identifiers.")
+    }
+
     bams <- c(g1.bam.files, g2.bam.files)
 
     # Check if bam.files is a character vector or BamFile object
@@ -137,12 +143,6 @@ find_differential <- function(regions, g1.bam.files, g2.bam.files,
     }
 
     # ------------ WINDOWS ------------
-    message("Reducing regions...")
-    regions <- reduce(regions)
-
-    # Add a REGION_ID column to keep track of the SEs the bins/windows are derived from
-    mcols(regions)$REGION_ID <- seq_along(regions)
-
     # set up windows for the SEs
     message(paste0("Defining ", window.size, " bp windows spaced ", window.spacing, " bp apart..."))
     region_windows <- slidingWindows(regions, width = window.size, step = window.spacing)
@@ -151,11 +151,11 @@ find_differential <- function(regions, g1.bam.files, g2.bam.files,
     num_region_windows <- elementNROWS(region_windows)
 
     # map the region IDs to the corresponding window
-    region_ids <- rep(mcols(regions)$REGION_ID, num_region_windows)
+    region_ids <- rep(regions$name, num_region_windows)
 
     # Assign the region IDs
     region_windows <- unlist(region_windows)
-    mcols(region_windows)$REGION_ID <- region_ids
+    mcols(region_windows)$name <- region_ids
 
 
     # ------------ COUNT ------------

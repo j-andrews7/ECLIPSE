@@ -25,7 +25,8 @@ find_differential(
 }
 \arguments{
 \item{regions}{A \code{GRanges} object of regions to compare between conditions.
-These regions will be reduced, i.e. overlapping regions will be merged to one.}
+These regions should be reduced, i.e. overlapping regions should be merged to one.
+The regions must also contain a "name" column with unique identifiers for each region.}
 
 \item{g1.bam.files}{A character vector of BAM file paths for group 1.}
 
