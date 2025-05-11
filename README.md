@@ -29,10 +29,10 @@ Currently, the package can be installed from GitHub:
 
 ```
 library(devtools)
-devtools::install_github("stjude-biohackathon/ECLIPSE")
+devtools::install_github("j-andrews7/ECLIPSE")
 
 # Or the developmental branch
-devtools::install_github("stjude-biohackathon/ECLIPSE@dev")
+devtools::install_github("j-andrews7/ECLIPSE@dev")
 ```
 
 ## Quick Start
@@ -54,10 +54,10 @@ library(ECLIPSE)
 library(BiocFileCache)
 
 # For annotation
-library(TxDb.Hsapiens.UCSC.hg38.knownGene)
+library(TxDb.Hsapiens.UCSC.hg38.refGene)
 library(org.Hs.eg.db)
 
-txdb <- TxDb.Hsapiens.UCSC.hg38.knownGene
+txdb <- TxDb.Hsapiens.UCSC.hg38.refGene
 
 # Limit to canonical chromosomes, out of bound warnings will abound if not done
 txdb <- keepStandardChromosomes(txdb, pruning.mode = "coarse")
@@ -88,6 +88,14 @@ naiveB1_enhancers <- run_rose(treatment = treat_bam, control = control_bam, peak
 head(naiveB1_enhancers)
 ```
 
+Can also make the classic swoosh plot:
+
+```r
+plot_enhancer_curve(naiveB1_enhancers, factor.label = "H3K27ac")
+```
+
+See the [vignette](https://github.com/j-andrews7/ECLIPSE/blob/main/vignettes/ECLIPSE.Rmd) for more examples, including differential comparisons between groups of samples.
+
 ## Development Roadmap
 
 - ~~Add missing ROSE functionality.~~
@@ -97,7 +105,7 @@ head(naiveB1_enhancers)
   - ~~Enhancer-gene annotations (within 50 kb by default for ROSE).~~
     - ~~Ability to limit to expressed genes.~~
 - ~~Allow BigWig or GRanges signal as input.~~
-- Add customizable visualization functions via Gviz.
+- ~~Add customizable visualization functions via Gviz.~~
 - Add Shiny application for interactive exploration of results via igvShiny.
 - Allow group-wise calling with sensible peak filtering via rmscp to mitigate effects of peak numbers on number of SEs identified due to daisy chaining effects.
 - Additional experimentation and recommended parameters for various data modalities (H3K27ac, ATAC, H3K4me1, etc).

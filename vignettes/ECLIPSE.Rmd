@@ -207,13 +207,13 @@ We can then see how these differ in the number of SEs identified.
 With TSS exclusion and unstitching, as is commonly done with the original implementation for H3K27ac data:
 
 ```{r, eval = FALSE}
-plot_enhancer_curve(res_tss_exl, factor_label = "H3K27ac")
+plot_enhancer_curve(res_tss_exl, factor.label = "H3K27ac")
 ```
 
 With TSS exclusion but no unstitching:
 
 ```{r, eval = FALSE}
-plot_enhancer_curve(res_tss_exl_no_unstitch, factor_label = "H3K27ac")
+plot_enhancer_curve(res_tss_exl_no_unstitch, factor.label = "H3K27ac")
 ```
 
 These settings have dramatic impacts on the final number of regions returned and the number (and size) of SEs identified.

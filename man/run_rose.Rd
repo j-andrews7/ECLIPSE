@@ -154,7 +154,7 @@ Default is \code{TRUE}.}
 
 \item{force}{Logical indicating whether to force recalculation of coverage, peak stitching, and annotation
 even if \code{sample_signal} is found in the \code{peaks} object.
-Default is \code{TRUE}.}
+Default is \code{FALSE}.}
 
 \item{debug}{Logical indicating whether to print debugging information and return a named list of
 intermediate results along with final results.}
